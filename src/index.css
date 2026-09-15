@@ -1,0 +1,174 @@
+@import 'tailwindcss';
+
+/* Tema claro/escuro via data-theme no <html>; utilitários do Tailwind leem estas variáveis */
+:root {
+  color-scheme: light;
+  --canvas: oklch(0.975 0.003 30);
+  --panel: oklch(0.995 0.002 30);
+  --sunken: oklch(0.955 0.004 30);
+  --hover: oklch(0.935 0.005 30);
+  --line: oklch(0.905 0.005 30);
+  --line-strong: oklch(0.82 0.007 30);
+  --ink: oklch(0.2 0.008 30);
+  --ink-2: oklch(0.44 0.01 30);
+  --ink-3: oklch(0.58 0.01 30);
+  --accent: oklch(0.58 0.235 27);
+  --accent-hover: oklch(0.52 0.22 27);
+  --accent-soft: oklch(0.95 0.03 27);
+  --accent-ink: oklch(0.5 0.2 27);
+  --on-accent: oklch(0.99 0.004 30);
+  --up: oklch(0.52 0.13 150);
+  --up-soft: oklch(0.95 0.035 150);
+  --down: oklch(0.55 0.2 27);
+  --down-soft: oklch(0.95 0.03 27);
+  --info: oklch(0.5 0.15 258);
+  --info-soft: oklch(0.95 0.025 258);
+  --warn: oklch(0.6 0.13 70);
+  --warn-soft: oklch(0.955 0.04 85);
+  --chart-1: oklch(0.58 0.235 27);
+  --chart-2: oklch(0.55 0.12 240);
+  --shadow: 0 1px 2px oklch(0.2 0.01 30 / 0.06), 0 8px 24px oklch(0.2 0.01 30 / 0.08);
+}
+
+:root[data-theme='dark'] {
+  color-scheme: dark;
+  --canvas: oklch(0.185 0.004 30);
+  --panel: oklch(0.225 0.004 30);
+  --sunken: oklch(0.255 0.005 30);
+  --hover: oklch(0.29 0.005 30);
+  --line: oklch(0.31 0.005 30);
+  --line-strong: oklch(0.4 0.006 30);
+  --ink: oklch(0.955 0.004 30);
+  --ink-2: oklch(0.76 0.006 30);
+  --ink-3: oklch(0.6 0.007 30);
+  --accent: oklch(0.63 0.23 27);
+  --accent-hover: oklch(0.69 0.2 27);
+  --accent-soft: oklch(0.3 0.07 27);
+  --accent-ink: oklch(0.76 0.14 27);
+  --on-accent: oklch(0.99 0.004 30);
+  --up: oklch(0.76 0.14 150);
+  --up-soft: oklch(0.3 0.05 150);
+  --down: oklch(0.72 0.16 27);
+  --down-soft: oklch(0.3 0.06 27);
+  --info: oklch(0.76 0.11 258);
+  --info-soft: oklch(0.3 0.05 258);
+  --warn: oklch(0.8 0.12 80);
+  --warn-soft: oklch(0.32 0.05 80);
+  --chart-1: oklch(0.66 0.21 27);
+  --chart-2: oklch(0.72 0.1 240);
+  --shadow: 0 1px 2px oklch(0 0 0 / 0.3), 0 12px 32px oklch(0 0 0 / 0.35);
+}
+
+@theme inline {
+  --font-sans: 'Roboto', ui-sans-serif, system-ui, -apple-system, 'Segoe UI', sans-serif;
+  --color-canvas: var(--canvas);
+  --color-panel: var(--panel);
+  --color-sunken: var(--sunken);
+  --color-hover: var(--hover);
+  --color-line: var(--line);
+  --color-line-strong: var(--line-strong);
+  --color-ink: var(--ink);
+  --color-ink-2: var(--ink-2);
+  --color-ink-3: var(--ink-3);
+  --color-accent: var(--accent);
+  --color-accent-hover: var(--accent-hover);
+  --color-accent-soft: var(--accent-soft);
+  --color-accent-ink: var(--accent-ink);
+  --color-on-accent: var(--on-accent);
+  --color-up: var(--up);
+  --color-up-soft: var(--up-soft);
+  --color-down: var(--down);
+  --color-down-soft: var(--down-soft);
+  --color-info: var(--info);
+  --color-info-soft: var(--info-soft);
+  --color-warn: var(--warn);
+  --color-warn-soft: var(--warn-soft);
+  --shadow-pop: var(--shadow);
+  --text-2xs: 0.6875rem;
+  --text-2xs--line-height: 1rem;
+}
+
+@layer base {
+  html,
+  body {
+    background: var(--canvas);
+    color: var(--ink);
+  }
+  body {
+    font-family: var(--font-sans);
+    font-size: 0.875rem;
+    line-height: 1.45;
+    -webkit-font-smoothing: antialiased;
+  }
+  ::selection {
+    background: var(--accent-soft);
+  }
+  :focus-visible {
+    outline: 2px solid var(--info);
+    outline-offset: 2px;
+  }
+  button:not(:disabled),
+  [role='button']:not([aria-disabled='true']) {
+    cursor: pointer;
+  }
+  dialog::backdrop {
+    background: oklch(0.15 0.01 30 / 0.5);
+  }
+}
+
+@layer utilities {
+  .toast-in {
+    animation: toast-in 220ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .fade-in {
+    animation: fade-in 180ms cubic-bezier(0.22, 1, 0.36, 1);
+  }
+  .skeleton {
+    background: linear-gradient(90deg, var(--sunken) 0%, var(--hover) 50%, var(--sunken) 100%);
+    background-size: 200% 100%;
+    animation: shimmer 1.4s linear infinite;
+  }
+  .scrollbar-none {
+    scrollbar-width: none;
+  }
+}
+
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(8px);
+  }
+}
+@keyframes fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(4px);
+  }
+}
+@keyframes shimmer {
+  to {
+    background-position: -200% 0;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    transition-duration: 1ms !important;
+  }
+}
+
+/* Relatório impresso/PDF: só o documento, sempre claro */
+@media print {
+  :root {
+    color-scheme: light;
+  }
+  .no-print {
+    display: none !important;
+  }
+  body {
+    background: white;
+  }
+}

@@ -3,62 +3,22 @@
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>YouTube Radar</title>
+    <meta name="robots" content="noindex" />
+    <title>JF Studio</title>
+    <script>
+      // Aplica o tema antes do primeiro paint para não piscar
+      (function () {
+        var saved = localStorage.getItem('jf:theme');
+        var dark = saved === 'dark' || ((!saved || saved === 'system') && matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.dataset.theme = dark ? 'dark' : 'light';
+      })();
+    </script>
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700;900&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="./styles.css" />
+    <link href="https://fonts.googleapis.com/css2?family=Roboto:wght@400;500;700&display=swap" rel="stylesheet" />
   </head>
   <body>
-    <div class="app-shell">
-      <aside class="sidebar" aria-label="Navegação principal">
-        <a class="brand" href="#inicio" aria-label="YouTube Radar, início"><span class="brand-mark">▶</span><span>YouTube <b>Radar</b></span></a>
-        <nav class="navigation" aria-label="Áreas do painel">
-          <button class="nav-item active" data-tab="inicio"><span>⌂</span>Painel</button>
-          <button class="nav-item" data-tab="ideias"><span>▣</span>Conteúdo</button>
-          <button class="nav-item" data-tab="copys"><span>▤</span>Roteiro do vídeo</button>
-          <button class="nav-item" data-tab="referencias"><span>▤</span>Inspirações</button>
-          <button class="nav-item" data-tab="concorrentes"><span>◉</span>Radar de canais</button>
-        </nav>
-        <div class="sidebar-bottom">
-          <button class="profile"><span class="avatar">JF</span><span><strong>Jéssica Freire</strong><small>@jessicafreireff</small></span><b>⌄</b></button>
-          <button class="sync-status" id="syncButton" type="button"><span class="sync-dot"></span><span id="syncText">Modo local</span></button>
-        </div>
-      </aside>
-
-      <main class="workspace">
-        <header class="topbar">
-          <button class="menu-toggle" aria-label="Abrir menu">☰</button>
-          <p id="crumb">VISÃO GERAL <span>/</span> HOJE</p>
-          <div class="top-actions"><button class="global-search" id="openSearch" aria-label="Buscar no painel"><span>⌕</span> Pesquisar no canal</button><button class="add-button" id="newIdea">+ Criar</button></div>
-        </header>
-
-        <section class="page active" id="inicio">
-          <div class="intro"><p class="eyebrow">PAINEL DO CANAL</p><h1 id="greeting">Bom dia, Jéssica</h1><p class="lede">Aqui está o que precisa de atenção para colocar o próximo vídeo no ar.</p></div>
-          <div class="dashboard-grid">
-            <section class="today card"><div class="section-heading"><p class="eyebrow">PRÓXIMO VÍDEO</p><button class="text-button" data-go="ideias">Ver conteúdo →</button></div><article class="featured-idea" id="featuredIdea"></article></section>
-            <section class="quick-stats" id="quickStats"></section>
-            <section class="watchlist card"><div class="section-heading"><p class="eyebrow">CANAIS NO RADAR</p><button class="text-button" data-go="concorrentes">Ver canais →</button></div><div id="watchlistRows"></div></section>
-          </div>
-          <section class="insights card"><div class="section-heading"><div><p class="eyebrow">LEITURA AUTOMÁTICA</p><h2>O que os números dizem</h2></div><div class="metrics-meta"><span id="metricsUpdated"></span><button class="text-button" id="refreshMetrics" type="button">Atualizar agora ↻</button></div></div><div class="insights-list" id="insightsList"></div></section>
-          <section class="inspiration"><div class="section-heading"><div><p class="eyebrow">TEMAS EM ALTA NO RADAR</p><h2>O que observar agora</h2></div><button class="text-button" data-go="referencias">Abrir inspirações →</button></div><div class="topic-list" id="topicList"></div></section>
-        </section>
-
-        <section class="page" id="ideias"><div class="page-header content-title"><div><p class="eyebrow">CONTEÚDO</p><h1>Biblioteca de <br /><em>vídeos planejados.</em></h1></div><button class="add-button" id="newIdea2">+ Criar vídeo</button></div><div class="filter-row"><button class="filter selected" data-filter="todas">Tudo <b>00</b></button><button class="filter" data-filter="rascunho">Rascunhos <b>00</b></button><button class="filter" data-filter="roteiro">Em roteiro <b>00</b></button><button class="filter" data-filter="publicado">Publicados <b>00</b></button></div><div class="content-head"><span>VÍDEO</span><span>VISIBILIDADE</span><span>STATUS</span><span></span></div><div class="ideas-list" id="ideasList"></div><p class="empty-ideas" hidden>Nenhum vídeo neste estágio ainda.</p></section>
-
-        <section class="page" id="copys"><div class="page-header script-header"><div><p class="eyebrow">ROTEIRO EM PRODUÇÃO</p><h1>Estruture antes <br />de <em>gravar.</em></h1><p>Escolha uma pauta e transforme a referência em um vídeo com começo, prova e CTA.</p></div><div class="script-status"><span>PROGRESSO</span><strong id="scriptProgress">0/5</strong><small>etapas concluídas</small></div></div><div class="script-workspace"><section class="script-editor"><div class="editor-top"><span class="tag coral">PAUTA SELECIONADA</span><button class="text-button" data-go="ideias">Trocar pauta →</button></div><label>Título provisório<input id="scriptTitle" /></label><label>Promessa para a audiência<textarea id="scriptBrief"></textarea></label><div class="outline"><p class="eyebrow">ESTRUTURA SUGERIDA</p><article><b>01</b><div><strong>Gancho</strong><p>Contextualize o teste e a pergunta que o vídeo vai responder.</p></div><button class="copy-button">Copiar</button></article><article><b>02</b><div><strong>Teste na prática</strong><p>Mostre o prompt, a criação e o resultado sem cortar os limites.</p></div><button class="copy-button">Copiar</button></article><article><b>03</b><div><strong>Veredito + CTA</strong><p>Feche com o que funcionou e convide o público a sugerir o próximo teste.</p></div><button class="copy-button">Copiar</button></article></div></section><aside class="production-checklist"><p class="eyebrow">CHECKLIST DE PRODUÇÃO</p><h2>Antes de publicar</h2><div id="checklist"></div><hr /><p class="script-note">Título, promessa e checklist são salvos automaticamente no banco enquanto você edita.</p></aside></div><section class="copy-library"><div class="section-heading"><div><p class="eyebrow">BIBLIOTECA DE GANCHOS</p><h2>Textos para adaptar</h2></div></div><div class="copy-grid"><article class="copy-card accent"><span class="tag coral">ABERTURA / 0–15S</span><blockquote>“Eu testei isso para descobrir se dá mesmo para criar vídeos que vendem — sem depender de achismo.”</blockquote><p>Gancho de teste: estabelece a promessa e abre espaço para uma conclusão objetiva.</p><button class="copy-button">Copiar texto</button></article><article class="copy-card"><span class="tag sand">TÍTULO</span><h3>Testei [ferramenta] para criar vídeos de TikTok Shop. Vale a pena?</h3><p>Estrutura direta de experimento, alinhada aos vídeos recentes do canal.</p><button class="copy-button">Copiar modelo</button></article><article class="copy-card"><span class="tag lavender">CTA FINAL</span><h3>“Comenta qual produto você quer que eu teste no próximo vídeo.”</h3><p>CTA para converter pesquisa de pauta em comentário qualificado.</p><button class="copy-button">Copiar texto</button></article></div></section></section>
-
-        <section class="page" id="referencias"><div class="page-header"><div><p class="eyebrow">BIBLIOTECA DE THUMBS</p><h1>Thumbs para analisar <br /><em>antes de criar.</em></h1></div><button class="outline-button" id="saveReference">+ Salvar link</button></div><div class="grid-heading"><p class="eyebrow">EM ALTA NO RADAR</p><h2>Vídeos acima da média dos canais que você acompanha</h2></div><div class="youtube-grid" id="trendingGrid"></div><div class="grid-heading"><p class="eyebrow">SALVOS POR VOCÊ</p><h2>Referências para analisar</h2></div><div class="youtube-grid" id="youtubeGrid"></div><p class="caption">O selo mostra quantas vezes o vídeo superou a mediana de views do próprio canal. Views, likes e inscritos são públicos e coletados automaticamente 2x por dia.</p></section>
-
-        <section class="page" id="concorrentes"><div class="page-header"><div><p class="eyebrow">CANAIS MONITORADOS</p><h1>Observe o formato, <br /><em>não copie o vídeo.</em></h1></div><button class="add-button" id="addChannel">+ Adicionar canal</button></div><div class="monitor-header"><span>CANAL</span><span>MELHOR VÍDEO RECENTE</span><span>RITMO</span><span></span></div><div class="monitor-list" id="monitorList"></div><p class="caption">Canais novos entram na próxima coleta automática (06h e 18h) ou na hora, pelo botão Atualizar agora do painel.</p></section>
-      </main>
-    </div>
-    <dialog id="ideaDialog"><form method="dialog"><button class="close" type="button" aria-label="Fechar">×</button><p class="eyebrow">NOVA IDEIA</p><h2>O que não pode<br />sair da sua cabeça?</h2><label>Título da ideia<input id="ideaTitle" required placeholder="Ex.: 30 dias sem delivery" /></label><label>Observação<textarea id="ideaNote" placeholder="Gancho, referência ou contexto..."></textarea></label><button class="add-button" value="default" id="saveIdea">Salvar ideia</button></form></dialog>
-    <dialog id="referenceDialog"><form><button class="close" type="button" aria-label="Fechar">×</button><p class="eyebrow">NOVA REFERÊNCIA</p><h2>Adicione um vídeo<br />ao seu <em>radar.</em></h2><label>Link do vídeo do YouTube<input id="referenceUrl" type="url" required placeholder="https://www.youtube.com/watch?v=..." /></label><label>Título para consulta<input id="referenceTitle" required placeholder="Ex.: Gancho que vale analisar" /></label><button class="add-button" type="submit">Salvar referência</button></form></dialog>
-    <dialog id="channelDialog"><form><button class="close" type="button" aria-label="Fechar">×</button><p class="eyebrow">NOVO CANAL</p><h2>Quem você quer<br /><em>acompanhar?</em></h2><label>Nome do canal<input id="channelName" required placeholder="Ex.: Canal referência" /></label><label>Handle ou URL<input id="channelHandle" required placeholder="Ex.: @canal" /></label><button class="add-button" type="submit">Adicionar ao radar</button></form></dialog>
-    <dialog id="searchDialog"><form method="dialog"><button class="close" type="button" aria-label="Fechar">×</button><p class="eyebrow">BUSCAR NO PAINEL</p><label class="search-label">Ideias, títulos e canais<input id="searchInput" type="search" placeholder="Ex.: TikTok Shop, POV, Jhonatas..." autofocus /></label><div class="search-results" id="searchResults"></div></form></dialog>
-    <dialog id="connectDialog"><form><button class="close" type="button" aria-label="Fechar">×</button><p class="eyebrow">BANCO DE DADOS</p><h2>Conectar ao<br /><em>GitHub.</em></h2><p class="dialog-text">Os dados ficam no repositório privado <b>jessicafreire-data</b>. Cole um token com acesso só a ele (Contents e Actions: leitura e escrita). O token fica salvo apenas neste navegador.</p><label>Token do GitHub<input id="tokenInput" type="password" required autocomplete="off" placeholder="github_pat_..." /></label><div class="dialog-actions"><button class="add-button" type="submit">Conectar</button><a class="text-button" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">Criar token →</a><button class="text-button danger" type="button" id="disconnect">Desconectar</button></div></form></dialog>
-    <div class="toast" role="status" aria-live="polite"></div>
-    <script type="module" src="./app.js"></script>
+    <div id="root"></div>
+    <script type="module" src="/src/main.tsx"></script>
   </body>
 </html>
