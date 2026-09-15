@@ -91,7 +91,7 @@ export function Settings() {
     <>
       <PageHeader title="Configurações" />
       <div className="rounded-xl border border-line bg-panel px-5 py-7 sm:px-8">
-        <Section title="Banco de dados" description={<>Pautas, relatórios e canais ficam no repositório privado <b className="font-medium text-ink">{DATA_REPO.split('/')[1]}</b>, salvos a cada alteração.</>}>
+        <Section title="Banco de dados" description={<>Pautas, relatórios e canais ficam no repositório privado <b className="font-medium text-ink">{DATA_REPO.split('/')[1]}</b>, salvos a cada alteração. A senha de acesso destrava esse acesso em cada aparelho.</>}>
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-4 py-3">
             <div>
               <SyncIndicator withLabel />
@@ -101,8 +101,11 @@ export function Settings() {
               Abrir repositório <ExternalLink size={13} aria-hidden />
             </a>
           </div>
+          <p className="mt-4 text-[13px] text-ink-2">
+            Para trocar a senha de acesso, rode <code className="rounded bg-sunken px-1 py-0.5 text-xs">npm run senha</code> no projeto e publique. Quem já entrou continua conectado.
+          </p>
           <form onSubmit={switchToken} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Field label="Trocar token" className="flex-1">
+            <Field label="Trocar token (manutenção)" className="flex-1">
               <Input type="password" autoComplete="off" value={newToken} onChange={(event) => setNewToken(event.target.value)} placeholder="github_pat_..." />
             </Field>
             <Button type="submit" icon={KeyRound} loading={switching} disabled={!newToken.trim()}>

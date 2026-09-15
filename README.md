@@ -17,10 +17,11 @@ Vite, React 19, TypeScript, Tailwind v4, lucide-react, React Router (hash) e @dn
 
 ## Acessos
 
-| Quem | Token fine-grained (só no `jessicafreire-data`) | Como entra |
-|---|---|---|
-| Kaleb (editor) | Contents + Actions: Read and write | Cola o token na tela de conexão |
-| Jéssica (leitura) | Contents: Read-only | Link gerado em Configurações → Link da Jéssica (`#/r?acesso=…`) |
+Quem usa entra com **senha** em https://kalebnobre7-bit.github.io/jessicafreire/ e o aparelho fica lembrado. A senha destrava, no próprio navegador, um token fine-grained do GitHub guardado criptografado em `src/access.json` (PBKDF2 + AES-GCM).
+
+- Trocar a senha ou o token: `npm run senha`, depois commit e push.
+- O token só alcança o `jessicafreire-data` (Contents e Actions). Para revogar: GitHub → Settings → Developer settings → Fine-grained tokens.
+- `#/r` continua abrindo só os relatórios publicados, para quando for útil mandar um link de leitura.
 
 ## Páginas
 
