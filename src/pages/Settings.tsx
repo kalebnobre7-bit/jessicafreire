@@ -203,6 +203,25 @@ export function Settings() {
           </div>
         </Section>
 
+        <Section title="Ideias com IA" description="O botão Gerar ideias, em O que gravar, roda no GitHub Actions com a API do Claude. A chave fica como secret do repositório de dados, nunca no navegador.">
+          <ol className="list-decimal space-y-1.5 pl-4 text-[13px] text-ink-2">
+            <li>
+              Crie uma chave em{' '}
+              <a className="text-info hover:underline" href="https://console.anthropic.com/settings/keys" target="_blank" rel="noreferrer">
+                console.anthropic.com
+              </a>
+            </li>
+            <li>
+              Salve como{' '}
+              <a className="text-info hover:underline" href={`https://github.com/${DATA_REPO}/settings/secrets/actions/new`} target="_blank" rel="noreferrer">
+                secret do repositório
+              </a>{' '}
+              com o nome <code className="rounded bg-sunken px-1 py-0.5 text-xs">ANTHROPIC_API_KEY</code>
+            </li>
+          </ol>
+          <p className="mt-3 text-xs text-ink-3">Cada rodada de 6 ideias custa alguns centavos de dólar.</p>
+        </Section>
+
         <Section title="Aparência" description="Seguir o sistema troca sozinho entre claro e escuro.">
           <SegmentedControl<ThemePreference>
             label="Tema"

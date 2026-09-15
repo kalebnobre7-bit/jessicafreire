@@ -1,9 +1,9 @@
-import { CornerDownLeft, FilePlus2, Lightbulb, MonitorPlay, Moon, Radar, RefreshCw, Search, SquareKanban, Sun, UserPlus, type LucideIcon } from 'lucide-react';
+import { CornerDownLeft, FilePlus2, LibraryBig, Lightbulb, MonitorPlay, Moon, Radar, RefreshCw, Search, SquareKanban, Sun, UserPlus, type LucideIcon } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router';
 import { Avatar, Thumb } from '@/components/ui/media';
 import { matchesQuery } from '@/lib/analytics';
-import { STAGE_LABEL } from '@/lib/constants';
+import { REFERENCE_KIND_LABEL, STAGE_LABEL } from '@/lib/constants';
 import { formatCompact } from '@/lib/format';
 import { useCreate } from '@/hooks/useCreate';
 import { useData } from '@/store/data';
@@ -65,9 +65,10 @@ export function CommandPalette({ open, onClose }: { open: boolean; onClose: () =
     const pages: Item[] = [...NAV_ITEMS, SETTINGS_ITEM].map((item) => ({ id: `page-${item.to}`, group: 'Páginas', label: item.label, icon: item.icon, run: go(item.to) }));
     const pautas: Item[] = db.pautas.map((pauta) => ({ id: `pauta-${pauta.id}`, group: 'Pautas', label: pauta.title || 'Sem título', detail: STAGE_LABEL[pauta.stage], icon: SquareKanban, keywords: pauta.tags.join(' '), run: go(`/pautas/${pauta.id}`) }));
     const videos: Item[] = (analysis?.profile?.videos ?? []).map((video) => ({ id: `video-${video.id}`, group: 'Vídeos do canal', label: video.title, detail: `${formatCompact(video.views)} views`, videoId: video.id, run: go(`/videos/${video.id}`) }));
-    const channels: Item[] = db.channels.map((channel) => ({ id: `channel-${channel.id}`, group: 'Radar', label: channel.name, detail: channel.handle, avatar: { src: analysis?.channels.get(channel.handle.toLowerCase())?.avatar ?? null, name: channel.name }, keywords: channel.handle, run: go('/radar?aba=canais') }));
+    const channels: Item[] = db.channels.map((channel) => ({ id: `channel-${channel.id}`, group: 'Radar', label: channel.name, detail: channel.handle, avatar: { src: analysis?.channels.get(channel.handle.toLowerCase())?.avatar ?? null, name: channel.name }, keywords: channel.handle, run: go(`/radar/${encodeURIComponent(channel.handle)}`) }));
+    const library: Item[] = db.references.map((reference) => ({ id: `ref-${reference.id}`, group: 'Biblioteca', label: reference.title, detail: REFERENCE_KIND_LABEL[reference.kind], icon: LibraryBig, videoId: reference.videoId ?? undefined, keywords: `${reference.tags.join(' ')} ${reference.note} ${reference.channel}`, run: go(`/biblioteca?tipo=${reference.kind}`) }));
     const trending: Item[] = (analysis?.trending ?? []).slice(0, 30).map((video) => ({ id: `trend-${video.id}`, group: 'Em alta no radar', label: video.title, detail: video.channelTitle, videoId: video.id, keywords: video.channelTitle, run: go('/radar') }));
-    const all = [...actions, ...pages, ...pautas, ...videos, ...channels, ...trending];
+    const all = [...actions, ...pages, ...pautas, ...library, ...videos, ...channels, ...trending];
     if (!query.trim()) return [...actions, ...pages];
     return all.filter((item) => matchesQuery(`${item.label} ${item.detail ?? ''} ${item.keywords ?? ''} ${item.group}`, query)).slice(0, 40);
   }, [analysis, collect, connected, createPauta, createReport, db, navigate, query, resolvedTheme, setTheme, toast]);

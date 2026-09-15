@@ -21,6 +21,8 @@ interface DataContextValue {
   sync: SyncStatus;
   collecting: boolean;
   mutate: (recipe: (draft: Database) => void) => void;
+  // Banco mais recente, inclusive mutações do mesmo clique que ainda não renderizaram
+  getDb: () => Database;
   connect: (token: string, mode?: AccessMode) => Promise<boolean>;
   disconnect: () => void;
   collect: () => Promise<'done' | 'slow' | 'forbidden' | 'failed'>;
@@ -111,6 +113,14 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
     } catch (error) {
       savingRef.current = false;
       if (error instanceof GitHubError && (error.status === 409 || error.status === 422)) {
+        const remote = await readFile('db.json').catch(() => null);
+        if (remote && remote.sha === shaRef.current) {
+          // O db.json não mudou: o 409 veio de outro commit chegando junto (print, coleta). Tenta de novo.
+          dirtyRef.current = true;
+          setSync('pending');
+          timerRef.current = window.setTimeout(pushDb, 1500);
+          return;
+        }
         // Outro aparelho salvou antes: fica com a versão do banco para não sobrescrever o trabalho de ninguém
         await pullDb(true);
         onConflict();
@@ -188,6 +198,8 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
     }
   }, [metrics?.updatedAt, pushDb]);
 
+  const getDb = useCallback(() => dbRef.current, []);
+
   const retrySave = useCallback(() => {
     dirtyRef.current = true;
     void pushDb();
@@ -220,8 +232,8 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
   const analysis = useMemo(() => (metrics ? analyzeMetrics(metrics, db) : null), [metrics, db]);
 
   const value = useMemo<DataContextValue>(
-    () => ({ db, metrics, analysis, mode, connected: Boolean(token), ready, sync, collecting, mutate, connect, disconnect, collect, retrySave }),
-    [db, metrics, analysis, mode, token, ready, sync, collecting, mutate, connect, disconnect, collect, retrySave],
+    () => ({ db, metrics, analysis, mode, connected: Boolean(token), ready, sync, collecting, mutate, getDb, connect, disconnect, collect, retrySave }),
+    [db, metrics, analysis, mode, token, ready, sync, collecting, mutate, getDb, connect, disconnect, collect, retrySave],
   );
 
   return <DataContext value={value}>{children}</DataContext>;

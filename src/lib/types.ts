@@ -26,13 +26,19 @@ export interface Pauta {
   updatedAt: number;
 }
 
+export type ReferenceKind = 'thumb' | 'video' | 'ideia' | 'gancho' | 'titulo' | 'formato';
+
 export interface Reference {
   id: string;
-  url: string;
-  videoId: string | null;
+  kind: ReferenceKind;
   title: string;
-  channel: string;
   note: string;
+  url: string | null;
+  videoId: string | null;
+  // Caminho do print no repositório privado (ex.: refs/abc.webp)
+  image: string | null;
+  channel: string;
+  tags: string[];
   savedAt: number;
 }
 
@@ -74,6 +80,8 @@ export interface Database {
   references: Reference[];
   channels: Channel[];
   reports: Report[];
+  // IDs de recomendações e ideias da IA dispensadas ou já transformadas em pauta
+  dismissed: string[];
 }
 
 export interface Video {
@@ -88,6 +96,8 @@ export interface ChannelMetrics {
   handle: string;
   channelId: string | null;
   title: string;
+  description?: string;
+  joinedDate?: string | null;
   avatar: string | null;
   subscribers: number | null;
   totalViews: number | null;
@@ -107,4 +117,24 @@ export interface Metrics {
   updatedAt: string;
   channels: Record<string, ChannelMetrics>;
   history: Record<string, ChannelHistory>;
+}
+
+export interface AiIdea {
+  id: string;
+  title: string;
+  hook: string;
+  angle: string;
+  format: string;
+  why: string;
+  thumbnail: string;
+  referenceVideoIds: string[];
+}
+
+export interface AiRun {
+  id: string;
+  createdAt: string;
+  focus: string;
+  status: 'ok' | 'error';
+  error?: string;
+  ideas: AiIdea[];
 }

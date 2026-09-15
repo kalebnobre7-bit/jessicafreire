@@ -1,4 +1,4 @@
-import { ArrowRight, CalendarDays, Heart, RefreshCw, SquareKanban, ThumbsUp, TrendingUp } from 'lucide-react';
+import { ArrowRight, CalendarDays, Heart, RefreshCw, Sparkles, SquareKanban, ThumbsUp, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
 import { LineChart } from '@/components/charts';
@@ -9,6 +9,7 @@ import { SegmentedControl } from '@/components/ui/form';
 import { Avatar, Thumb } from '@/components/ui/media';
 import { buildInsights, dailyGains, valueAt, valueFrom, type AnalyzedChannel, type Point } from '@/lib/analytics';
 import { STAGE_LABEL } from '@/lib/constants';
+import { buildRecommendations, RECOMMENDATION_LABEL } from '@/lib/recommendations';
 import { dateKey, formatAge, formatCompact, formatDate, formatNumber, formatPercent, shiftDate } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
 import { useCreate } from '@/hooks/useCreate';
@@ -254,6 +255,30 @@ function RadarHighlights() {
   );
 }
 
+function WhatToRecord() {
+  const { db, analysis } = useData();
+  const recommendations = useMemo(() => buildRecommendations(analysis, db).slice(0, 3), [analysis, db]);
+  if (!recommendations.length) return null;
+  return (
+    <Panel className="xl:col-span-3" title="O que gravar agora" description="As sugestões mais fortes dos dados" actions={<ButtonLink to="/o-que-gravar" variant="ghost" size="sm" icon={Sparkles}>Ver todas e gerar com IA</ButtonLink>}>
+      <ul className="grid gap-3 md:grid-cols-3">
+        {recommendations.map((recommendation) => (
+          <li key={recommendation.id}>
+            <Link to="/o-que-gravar" className="flex h-full gap-3 rounded-lg border border-line p-3 transition-colors duration-150 hover:border-line-strong hover:bg-hover">
+              {recommendation.videoIds[0] ? <Thumb videoId={recommendation.videoIds[0]} className="w-24" /> : null}
+              <div className="min-w-0">
+                <p className="text-2xs font-medium text-accent-ink">{RECOMMENDATION_LABEL[recommendation.kind]}</p>
+                <p className="mt-0.5 line-clamp-2 text-[13px] leading-snug font-medium text-ink">{recommendation.title}</p>
+                <p className="mt-1 line-clamp-2 text-xs text-ink-2">{recommendation.reason}</p>
+              </div>
+            </Link>
+          </li>
+        ))}
+      </ul>
+    </Panel>
+  );
+}
+
 function OverviewSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
@@ -298,6 +323,7 @@ export function Overview() {
             {insights.length ? <InsightList insights={insights} /> : <EmptyState icon={TrendingUp} title="Nada fora do normal">As leituras aparecem quando um vídeo foge da mediana, uma pauta atrasa ou um tema cresce no radar.</EmptyState>}
           </Panel>
           <UpcomingPautas />
+          <WhatToRecord />
           <TopVideos profile={profile} />
           <RadarHighlights />
         </div>

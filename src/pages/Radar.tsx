@@ -1,25 +1,24 @@
-import { Bookmark, BookmarkCheck, ExternalLink, Flame, Hash, Link2, Lightbulb, MoreHorizontal, Plus, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChartColumn, ExternalLink, Flame, Hash, Lightbulb, MoreHorizontal, Plus, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
-import { useSearchParams } from 'react-router';
+import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button, IconButton } from '@/components/ui/button';
 import { Badge, EmptyState, PageHeader, Panel, ScoreBadge } from '@/components/ui/feedback';
 import { Field, Input, Select } from '@/components/ui/form';
 import { Avatar, Thumb } from '@/components/ui/media';
 import { ConfirmDialog, Menu } from '@/components/ui/overlay';
 import type { AnalyzedChannel } from '@/lib/analytics';
-import { createId, normalizeHandle, parseVideoId } from '@/lib/database';
+import { createId, normalizeHandle } from '@/lib/database';
 import { formatAge, formatCompact, formatScore } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
 import { useCreate } from '@/hooks/useCreate';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
 
-type Tab = 'alta' | 'canais' | 'temas' | 'salvos';
+type Tab = 'alta' | 'canais' | 'temas';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'alta', label: 'Em alta' },
   { id: 'canais', label: 'Canais' },
   { id: 'temas', label: 'Temas' },
-  { id: 'salvos', label: 'Salvos' },
 ];
 
 function Trending() {
@@ -71,17 +70,17 @@ function Trending() {
                 <a href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm leading-snug font-medium text-ink hover:underline">
                   {video.title}
                 </a>
-                <p className="mt-1 text-xs text-ink-2">{video.channelTitle}</p>
+                <Link to={`/radar/${encodeURIComponent(video.channelHandle)}`} className="mt-1 block text-xs text-ink-2 hover:text-ink">{video.channelTitle}</Link>
                 <p className="text-xs text-ink-3">
                   {formatCompact(video.views)} visualizações · {formatAge(video.published)}
                 </p>
               </div>
               {saved.has(video.id) ? (
-                <span className="flex size-8 shrink-0 items-center justify-center text-up" title="Salvo nas referências">
-                  <BookmarkCheck size={18} aria-label="Salvo" />
+                <span className="flex size-8 shrink-0 items-center justify-center text-up" title="Na biblioteca">
+                  <BookmarkCheck size={18} aria-label="Na biblioteca" />
                 </span>
               ) : (
-                <IconButton icon={Bookmark} size="sm" label="Salvar como referência" onClick={() => saveReference(video.id)} />
+                <IconButton icon={Bookmark} size="sm" label="Salvar na biblioteca" onClick={() => saveReference(video.id)} />
               )}
             </div>
           </article>
@@ -91,7 +90,7 @@ function Trending() {
   );
 }
 
-function ChannelRow({ label, channel, you }: { label: string; channel: AnalyzedChannel | undefined; you?: boolean }) {
+function ChannelRow({ label, handle, channel, you }: { label: string; handle: string; channel: AnalyzedChannel | undefined; you?: boolean }) {
   return (
     <>
       <td className="py-3 pr-4 pl-5">
@@ -99,10 +98,16 @@ function ChannelRow({ label, channel, you }: { label: string; channel: AnalyzedC
           <Avatar src={channel?.avatar} name={label} size={36} />
           <div className="min-w-0">
             <p className="flex items-center gap-2 font-medium text-ink">
-              {label}
+              {handle ? (
+                <Link to={`/radar/${encodeURIComponent(handle)}`} className="hover:underline">
+                  {label}
+                </Link>
+              ) : (
+                label
+              )}
               {you ? <Badge tone="accent">Canal gerenciado</Badge> : null}
             </p>
-            <p className="text-xs text-ink-3">{channel?.handle}</p>
+            <p className="text-xs text-ink-3">{handle}</p>
           </div>
         </div>
       </td>
@@ -136,6 +141,7 @@ function Channels() {
   const { db, analysis, mutate, connected } = useData();
   const { collect, collecting } = useCollect();
   const { toast } = useUi();
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const [name, setName] = useState('');
   const [handle, setHandle] = useState('');
@@ -213,18 +219,19 @@ function Channels() {
             </thead>
             <tbody className="divide-y divide-line">
               <tr className="bg-accent-soft/40">
-                <ChannelRow label={db.profile.name} channel={analysis?.profile ?? undefined} you />
+                <ChannelRow label={db.profile.name} handle={db.profile.handle} channel={analysis?.profile ?? undefined} you />
                 <td />
               </tr>
               {db.channels.map((channel) => {
                 const data = analysis?.channels.get(channel.handle.toLowerCase());
                 return (
                   <tr key={channel.id} className="hover:bg-hover">
-                    <ChannelRow label={channel.name} channel={data ? { ...data, handle: channel.handle } : undefined} />
+                    <ChannelRow label={channel.name} handle={channel.handle} channel={data} />
                     <td className="py-3 pr-3 text-right">
                       <Menu
                         trigger={({ toggle, open, id }) => <IconButton icon={MoreHorizontal} size="sm" label={`Ações de ${channel.name}`} onClick={toggle} aria-expanded={open} aria-controls={id} />}
                         items={[
+                          { label: 'Ver página do canal', icon: ChartColumn, onSelect: () => navigate(`/radar/${encodeURIComponent(channel.handle)}`) },
                           { label: 'Abrir no YouTube', icon: ExternalLink, onSelect: () => window.open(`https://www.youtube.com/${channel.handle}`, '_blank', 'noreferrer') },
                           { label: 'Remover do radar', icon: Trash2, danger: true, onSelect: () => setRemoving(channel.id) },
                         ]}
@@ -307,86 +314,6 @@ function Topics() {
   );
 }
 
-function Saved() {
-  const { db, analysis, mutate } = useData();
-  const { toast } = useUi();
-  const [url, setUrl] = useState('');
-  const [title, setTitle] = useState('');
-
-  const submit = (event: FormEvent) => {
-    event.preventDefault();
-    const videoId = parseVideoId(url);
-    if (!videoId && !/^https?:\/\//.test(url)) {
-      toast('Cole um link que comece com http ou https.', 'error');
-      return;
-    }
-    const known = videoId ? analysis?.videoById.get(videoId) : undefined;
-    mutate((draft) => void draft.references.unshift({ id: createId(), url, videoId, title: title.trim() || known?.title || 'Referência sem título', channel: known?.channelTitle ?? 'Link manual', note: '', savedAt: Date.now() }));
-    setUrl('');
-    setTitle('');
-    toast('Referência salva.');
-  };
-
-  return (
-    <>
-      <Panel className="mb-5" title="Salvar link">
-        <form onSubmit={submit} className="grid gap-3 md:grid-cols-[1.4fr_1fr_auto] md:items-end">
-          <Field label="Link do vídeo">
-            <Input type="url" required value={url} onChange={(event) => setUrl(event.target.value)} placeholder="https://www.youtube.com/watch?v=..." />
-          </Field>
-          <Field label="Título para lembrar" hint="Opcional se o vídeo já está no radar">
-            <Input value={title} onChange={(event) => setTitle(event.target.value)} placeholder="Ex.: gancho de teste em 5 segundos" />
-          </Field>
-          <Button type="submit" icon={Link2} className="md:mb-5">
-            Salvar
-          </Button>
-        </form>
-      </Panel>
-      {db.references.length ? (
-        <div className="grid gap-x-4 gap-y-6 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
-          {db.references.map((reference) => {
-            const video = reference.videoId ? analysis?.videoById.get(reference.videoId) : undefined;
-            const usedIn = db.pautas.filter((pauta) => pauta.referenceIds.includes(reference.id));
-            return (
-              <article key={reference.id} className="min-w-0">
-                <a href={reference.url} target="_blank" rel="noreferrer">
-                  <Thumb videoId={reference.videoId} quality="hqdefault" className="rounded-xl" badge={video?.score != null ? formatScore(video.score) : undefined} />
-                </a>
-                <div className="mt-3 flex gap-2">
-                  <div className="min-w-0 flex-1">
-                    <a href={reference.url} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm leading-snug font-medium text-ink hover:underline">
-                      {reference.title}
-                    </a>
-                    <p className="mt-1 text-xs text-ink-2">{reference.channel}</p>
-                    <p className="text-xs text-ink-3">{video ? `${formatCompact(video.views)} visualizações · ${formatAge(video.published)}` : `Salvo ${formatAge(reference.savedAt)}`}</p>
-                    {usedIn.length ? <p className="mt-1 text-2xs text-info">Usada em {usedIn.length === 1 ? `"${usedIn[0]?.title}"` : `${usedIn.length} pautas`}</p> : null}
-                  </div>
-                  <IconButton
-                    icon={Trash2}
-                    size="sm"
-                    label="Remover referência"
-                    onClick={() => {
-                      mutate((draft) => {
-                        draft.references = draft.references.filter((item) => item.id !== reference.id);
-                        for (const pauta of draft.pautas) pauta.referenceIds = pauta.referenceIds.filter((item) => item !== reference.id);
-                      });
-                      toast('Referência removida.');
-                    }}
-                  />
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      ) : (
-        <Panel>
-          <EmptyState icon={Bookmark} title="Nenhuma referência salva">Use o marcador nos vídeos em alta ou cole um link acima.</EmptyState>
-        </Panel>
-      )}
-    </>
-  );
-}
-
 export function Radar() {
   const { db, analysis } = useData();
   const [params, setParams] = useSearchParams();
@@ -396,7 +323,7 @@ export function Radar() {
     if (params.get('novo') === '1' && tab !== 'canais') setParams({ aba: 'canais', novo: '1' });
   }, [params, setParams, tab]);
 
-  const counts: Record<Tab, number> = { alta: analysis?.trending.length ?? 0, canais: db.channels.length, temas: analysis?.topics.length ?? 0, salvos: db.references.length };
+  const counts: Record<Tab, number> = { alta: analysis?.trending.length ?? 0, canais: db.channels.length, temas: analysis?.topics.length ?? 0 };
 
   return (
     <>
@@ -418,7 +345,7 @@ export function Radar() {
           ))}
         </div>
       </PageHeader>
-      {tab === 'alta' ? <Trending /> : tab === 'canais' ? <Channels /> : tab === 'temas' ? <Topics /> : <Saved />}
+      {tab === 'alta' ? <Trending /> : tab === 'canais' ? <Channels /> : <Topics />}
     </>
   );
 }

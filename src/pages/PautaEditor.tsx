@@ -4,10 +4,10 @@ import { Link, useNavigate, useParams } from 'react-router';
 import { Button, ButtonLink, IconButton } from '@/components/ui/button';
 import { Badge, EmptyState, Panel, ScoreBadge } from '@/components/ui/feedback';
 import { BareInput, Field, Input, Select, Textarea } from '@/components/ui/form';
-import { Thumb } from '@/components/ui/media';
+import { RepoImage, Thumb } from '@/components/ui/media';
 import { ConfirmDialog, Menu } from '@/components/ui/overlay';
 import { findPublishedMatch } from '@/lib/analytics';
-import { CHECKLIST, DEFAULT_SECTIONS, STAGES } from '@/lib/constants';
+import { CHECKLIST, DEFAULT_SECTIONS, REFERENCE_KIND_LABEL, STAGES } from '@/lib/constants';
 import { createId, createPauta } from '@/lib/database';
 import { formatAge, formatCompact, formatDate } from '@/lib/format';
 import type { Pauta, Stage } from '@/lib/types';
@@ -225,16 +225,16 @@ export function PautaEditor() {
             </ul>
           </Panel>
 
-          <Panel title="Referências" description="Vídeos que inspiram esta pauta">
+          <Panel title="Referências" description="Thumbs, vídeos e ideias da biblioteca">
             {linkedReferences.length ? (
               <ul className="mb-3 space-y-2.5">
                 {linkedReferences.map((reference) => (
                   <li key={reference.id} className="flex items-center gap-3">
-                    <a href={reference.url} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-3 hover:underline">
-                      <Thumb videoId={reference.videoId} className="w-20" />
+                    <a href={reference.url ?? undefined} target="_blank" rel="noreferrer" className="flex min-w-0 flex-1 items-center gap-3 hover:underline">
+                      {reference.image ? <RepoImage path={reference.image} className="aspect-video w-20 shrink-0 rounded" /> : reference.videoId ? <Thumb videoId={reference.videoId} className="w-20" /> : null}
                       <span className="min-w-0">
                         <span className="line-clamp-2 text-xs text-ink">{reference.title}</span>
-                        <span className="text-2xs text-ink-3">{reference.channel}</span>
+                        <span className="text-2xs text-ink-3">{[REFERENCE_KIND_LABEL[reference.kind], reference.channel].filter(Boolean).join(' · ')}</span>
                       </span>
                     </a>
                     <IconButton icon={X} size="sm" label="Remover referência da pauta" onClick={() => update((draft) => void (draft.referenceIds = draft.referenceIds.filter((item) => item !== reference.id)))} />
@@ -244,16 +244,16 @@ export function PautaEditor() {
             ) : null}
             {availableReferences.length ? (
               <Select value="" onChange={(event) => event.target.value && update((draft) => void draft.referenceIds.push(event.target.value))} aria-label="Adicionar referência">
-                <option value="">Adicionar referência salva…</option>
+                <option value="">Adicionar da biblioteca…</option>
                 {availableReferences.map((reference) => (
                   <option key={reference.id} value={reference.id}>
-                    {reference.title.slice(0, 70)}
+                    {REFERENCE_KIND_LABEL[reference.kind]} · {reference.title.slice(0, 64)}
                   </option>
                 ))}
               </Select>
             ) : (
               <p className="text-xs text-ink-2">
-                Salve vídeos no <Link to="/radar?aba=salvos" className="text-info hover:underline">Radar</Link> para usar aqui.
+                Salve thumbs, vídeos e ideias na <Link to="/biblioteca" className="text-info hover:underline">Biblioteca</Link> para usar aqui.
               </p>
             )}
           </Panel>

@@ -1,6 +1,7 @@
-import { Play } from 'lucide-react';
-import { useState } from 'react';
+import { ImageOff, Play } from 'lucide-react';
+import { useEffect, useState } from 'react';
 import { initials } from '@/lib/format';
+import { repoImageUrl } from '@/lib/images';
 
 export function Thumb({ videoId, alt = '', className = '', badge, quality = 'mqdefault' }: { videoId: string | null; alt?: string; className?: string; badge?: string; quality?: 'mqdefault' | 'hqdefault' }) {
   const [failed, setFailed] = useState(false);
@@ -29,4 +30,28 @@ export function Avatar({ src, name, size = 32, className = '' }: { src?: string 
       {initials(name)}
     </span>
   );
+}
+
+// Print guardado no repositório privado: baixa com o token e mostra como blob URL
+export function RepoImage({ path, alt = '', className = '' }: { path: string; alt?: string; className?: string }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [failed, setFailed] = useState(false);
+  useEffect(() => {
+    let active = true;
+    setFailed(false);
+    repoImageUrl(path)
+      .then((value) => active && setUrl(value))
+      .catch(() => active && setFailed(true));
+    return () => {
+      active = false;
+    };
+  }, [path]);
+  if (failed) {
+    return (
+      <div className={`flex items-center justify-center bg-sunken text-ink-3 ${className}`}>
+        <ImageOff size={18} aria-label="Imagem indisponível" />
+      </div>
+    );
+  }
+  return url ? <img src={url} alt={alt} className={`object-cover ${className}`} /> : <div className={`skeleton ${className}`} aria-hidden />;
 }

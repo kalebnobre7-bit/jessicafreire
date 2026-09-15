@@ -87,15 +87,58 @@ export async function readRawFile(file: string): Promise<unknown> {
   return JSON.parse(await request<string>(`/contents/${file}`, {}, 'application/vnd.github.raw+json'));
 }
 
+// Cada gravação vira um commit na main: duas ao mesmo tempo disputam o topo do branch e uma leva 409.
+// A fila faz as gravações deste navegador saírem uma de cada vez.
+let writeQueue: Promise<unknown> = Promise.resolve();
+function enqueue<T>(task: () => Promise<T>): Promise<T> {
+  const run = writeQueue.then(task, task);
+  writeQueue = run.catch(() => undefined);
+  return run;
+}
+const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
+
 // `sha` é a versão que o painel conhece; se outro aparelho salvou antes, o GitHub responde 409
 export async function writeFile(file: string, value: unknown, sha: string | null, message: string): Promise<string> {
-  const data = await request<{ content: { sha: string } }>(`/contents/${file}`, {
-    method: 'PUT',
-    body: JSON.stringify({ message, content: encodeBase64(`${JSON.stringify(value, null, 2)}\n`), ...(sha ? { sha } : {}) }),
-  });
+  const data = await enqueue(() =>
+    request<{ content: { sha: string } }>(`/contents/${file}`, {
+      method: 'PUT',
+      body: JSON.stringify({ message, content: encodeBase64(`${JSON.stringify(value, null, 2)}\n`), ...(sha ? { sha } : {}) }),
+    }),
+  );
   return data.content.sha;
 }
 
 export async function startCollection(): Promise<void> {
-  await request('/actions/workflows/collect.yml/dispatches', { method: 'POST', body: JSON.stringify({ ref: 'main' }) });
+  await startWorkflow('collect.yml');
+}
+
+export async function startWorkflow(file: string, inputs?: Record<string, string>): Promise<void> {
+  await request(`/actions/workflows/${file}/dispatches`, { method: 'POST', body: JSON.stringify({ ref: 'main', ...(inputs ? { inputs } : {}) }) });
+}
+
+// Prints da biblioteca: arquivos binários no repositório privado (só leitura com token, então viram blob URL)
+export async function writeBinary(path: string, base64: string, message: string): Promise<void> {
+  // Arquivo novo: repetir é seguro se o 409 veio de outro commit chegando junto (ex.: coleta do Actions)
+  for (let attempt = 0; ; attempt += 1) {
+    try {
+      await enqueue(() => request(`/contents/${path}`, { method: 'PUT', body: JSON.stringify({ message, content: base64 }) }));
+      return;
+    } catch (error) {
+      if (!(error instanceof GitHubError && error.status === 409) || attempt === 2) throw error;
+      await wait(800);
+    }
+  }
+}
+
+export async function readBlob(path: string): Promise<Blob> {
+  const response = await fetch(`https://api.github.com/repos/${DATA_REPO}/contents/${path}`, {
+    headers: { Accept: 'application/vnd.github.raw+json', Authorization: `Bearer ${getToken() ?? ''}`, 'X-GitHub-Api-Version': '2022-11-28' },
+  });
+  if (!response.ok) throw new GitHubError(response.status);
+  return response.blob();
+}
+
+export async function deleteFile(path: string, message: string): Promise<void> {
+  const { sha } = await request<{ sha: string }>(`/contents/${path}`);
+  await enqueue(() => request(`/contents/${path}`, { method: 'DELETE', body: JSON.stringify({ message, sha }) }));
 }

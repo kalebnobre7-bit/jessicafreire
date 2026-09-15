@@ -1,12 +1,15 @@
 import type { ReactNode } from 'react';
 import { HashRouter, Navigate, Route, Routes } from 'react-router';
 import { AppShell } from './components/layout/AppShell';
+import { ChannelDetail } from './pages/ChannelDetail';
 import { Connect } from './pages/Connect';
+import { Library } from './pages/Library';
 import { NotFound } from './pages/NotFound';
 import { Overview } from './pages/Overview';
 import { PautaEditor } from './pages/PautaEditor';
 import { Pautas } from './pages/Pautas';
 import { Radar } from './pages/Radar';
+import { Recommendations } from './pages/Recommendations';
 import { ReportEditor } from './pages/ReportEditor';
 import { ReportReader } from './pages/ReportReader';
 import { Reports } from './pages/Reports';
@@ -45,7 +48,10 @@ function AppRoutes() {
         <Route path="videos/:id" element={<VideoDetail />} />
         <Route path="pautas" element={<Pautas />} />
         <Route path="pautas/:id" element={<PautaEditor />} />
+        <Route path="o-que-gravar" element={<Recommendations />} />
         <Route path="radar" element={<Radar />} />
+        <Route path="radar/:handle" element={<ChannelDetail />} />
+        <Route path="biblioteca" element={<Library />} />
         <Route path="relatorios" element={<Reports />} />
         <Route path="relatorios/:id" element={<ReportEditor />} />
         <Route path="config" element={<Settings />} />

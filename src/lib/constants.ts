@@ -1,4 +1,4 @@
-import type { Stage } from './types';
+import type { ReferenceKind, Stage } from './types';
 
 export const DATA_REPO = 'kalebnobre7-bit/jessicafreire-data';
 
@@ -26,3 +26,14 @@ export const DEFAULT_SECTIONS = [
   { label: 'Desenvolvimento', placeholder: 'Teste, prova e passo a passo, sem esconder os limites.' },
   { label: 'CTA', placeholder: 'O que a pessoa deve fazer ao final (comentar, clicar, assistir o próximo).' },
 ];
+
+export const REFERENCE_KINDS: { id: ReferenceKind; label: string; plural: string; hint: string }[] = [
+  { id: 'thumb', label: 'Thumb', plural: 'Thumbs', hint: 'Capa que chamou atenção' },
+  { id: 'video', label: 'Vídeo', plural: 'Vídeos', hint: 'Vídeo para estudar' },
+  { id: 'ideia', label: 'Ideia', plural: 'Ideias', hint: 'Ideia de vídeo solta' },
+  { id: 'gancho', label: 'Gancho', plural: 'Ganchos', hint: 'Frase de abertura' },
+  { id: 'titulo', label: 'Título', plural: 'Títulos', hint: 'Título para testar' },
+  { id: 'formato', label: 'Formato', plural: 'Formatos', hint: 'Estrutura ou estilo de vídeo' },
+];
+
+export const REFERENCE_KIND_LABEL = Object.fromEntries(REFERENCE_KINDS.map((kind) => [kind.id, kind.label])) as Record<ReferenceKind, string>;

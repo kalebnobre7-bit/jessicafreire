@@ -1,5 +1,5 @@
 import { CHECKLIST, DEFAULT_SECTIONS } from './constants';
-import type { Database, Pauta, Stage } from './types';
+import type { Database, Pauta, ReferenceKind, Stage } from './types';
 
 export function createId(): string {
   return `${Date.now().toString(36)}${Math.random().toString(36).slice(2, 6)}`;
@@ -12,6 +12,7 @@ export const EMPTY_DATABASE: Database = {
   references: [],
   channels: [],
   reports: [],
+  dismissed: [],
 };
 
 export function createPauta(partial: Partial<Pauta> = {}): Pauta {
@@ -45,6 +46,8 @@ function asString(value: unknown, fallback = ''): string {
 function asArray(value: unknown): unknown[] {
   return Array.isArray(value) ? value : [];
 }
+
+const REFERENCE_KINDS: ReferenceKind[] = ['thumb', 'video', 'ideia', 'gancho', 'titulo', 'formato'];
 
 const LEGACY_STAGE: Record<string, Stage> = { rascunho: 'ideia', roteiro: 'roteiro', publicado: 'publicado' };
 
@@ -80,15 +83,22 @@ export function normalizeDatabase(raw: unknown): Database {
     version: 2,
     profile: { name: asString(profile.name, EMPTY_DATABASE.profile.name), handle: asString(profile.handle, EMPTY_DATABASE.profile.handle) },
     pautas,
-    references: asArray(raw.references).filter(isRecord).map((item) => ({
-      id: asString(item.id, createId()),
-      url: asString(item.url),
-      videoId: typeof item.videoId === 'string' && item.videoId ? item.videoId : null,
-      title: asString(item.title),
-      channel: asString(item.channel),
-      note: asString(item.note),
-      savedAt: typeof item.savedAt === 'number' ? item.savedAt : Date.now(),
-    })),
+    references: asArray(raw.references).filter(isRecord).map((item) => {
+      const videoId = typeof item.videoId === 'string' && item.videoId ? item.videoId : null;
+      const kind = REFERENCE_KINDS.includes(item.kind as ReferenceKind) ? (item.kind as ReferenceKind) : videoId || item.url ? 'video' : 'ideia';
+      return {
+        id: asString(item.id, createId()),
+        kind,
+        title: asString(item.title),
+        note: asString(item.note),
+        url: asString(item.url) || null,
+        videoId,
+        image: typeof item.image === 'string' && item.image ? item.image : null,
+        channel: asString(item.channel),
+        tags: asArray(item.tags).map((tag) => asString(tag)).filter(Boolean),
+        savedAt: typeof item.savedAt === 'number' ? item.savedAt : Date.now(),
+      };
+    }),
     channels: asArray(raw.channels).filter(isRecord).map((item) => ({
       id: asString(item.id, createId()),
       name: asString(item.name),
@@ -96,6 +106,7 @@ export function normalizeDatabase(raw: unknown): Database {
       note: asString(item.note),
     })),
     reports: asArray(raw.reports).filter(isRecord).map((item) => item as unknown as Database['reports'][number]),
+    dismissed: asArray(raw.dismissed).map((id) => asString(id)).filter(Boolean),
   };
 }
 

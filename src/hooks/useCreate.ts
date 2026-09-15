@@ -9,7 +9,7 @@ import { useUi } from '@/store/ui';
 
 export function useCreate() {
   const navigate = useNavigate();
-  const { mutate, analysis } = useData();
+  const { mutate, getDb, analysis } = useData();
   const { toast } = useUi();
 
   const createPautaAndOpen = useCallback((partial: Partial<Pauta> = {}) => {
@@ -31,17 +31,24 @@ export function useCreate() {
     navigate(`/relatorios/${id}`);
   }, [mutate, navigate]);
 
-  const saveReference = useCallback((videoId: string) => {
+  // Garante o vídeo na biblioteca e devolve o id da referência (existente ou nova)
+  const ensureVideoReference = useCallback((videoId: string): string | null => {
+    const existing = getDb().references.find((reference) => reference.videoId === videoId);
+    if (existing) return existing.id;
     const video = analysis?.videoById.get(videoId);
-    if (!video) return;
-    let added = false;
+    if (!video) return null;
+    const id = createId();
     mutate((db) => {
-      if (db.references.some((reference) => reference.videoId === videoId)) return;
-      db.references.unshift({ id: createId(), url: `https://www.youtube.com/watch?v=${videoId}`, videoId, title: video.title, channel: video.channelTitle, note: '', savedAt: Date.now() });
-      added = true;
+      db.references.unshift({ id, kind: 'video', url: `https://www.youtube.com/watch?v=${videoId}`, videoId, image: null, title: video.title, channel: video.channelTitle, note: '', tags: [], savedAt: Date.now() });
     });
-    toast(added ? 'Salvo nas referências do Radar.' : 'Esse vídeo já está nas referências.');
-  }, [analysis, mutate, toast]);
+    return id;
+  }, [analysis, getDb, mutate]);
 
-  return { createPauta: createPautaAndOpen, createReport, saveReference };
+  const saveReference = useCallback((videoId: string) => {
+    const existed = getDb().references.some((reference) => reference.videoId === videoId);
+    ensureVideoReference(videoId);
+    toast(existed ? 'Esse vídeo já está na Biblioteca.' : 'Salvo na Biblioteca.');
+  }, [ensureVideoReference, getDb, toast]);
+
+  return { createPauta: createPautaAndOpen, createReport, saveReference, ensureVideoReference };
 }

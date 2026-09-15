@@ -156,7 +156,7 @@ function analyzeChannel(channel: ChannelMetrics, history: Metrics['history'][str
 }
 
 // Temas que se repetem nos vídeos acima da média do radar (palavras e pares de palavras)
-function findTopics(videos: AnalyzedVideo[], db: Database): Topic[] {
+export function findTopics(videos: AnalyzedVideo[], db: Database, { minTotal = 3, minHits = 2, limit = 8 } = {}): Topic[] {
   const stats = new Map<string, { term: string; label: string; total: number; hits: number; scoreSum: number; videoIds: string[] }>();
   for (const video of videos) {
     if (video.score == null) continue;
@@ -176,7 +176,7 @@ function findTopics(videos: AnalyzedVideo[], db: Database): Topic[] {
     }
   }
   const ranked = [...stats.values()]
-    .filter((entry) => entry.total >= 3 && entry.hits >= 2)
+    .filter((entry) => entry.total >= minTotal && entry.hits >= minHits)
     .map((entry) => ({ ...entry, avgScore: entry.scoreSum / entry.total }))
     // Só entra tema que, na média, performa acima do normal dos canais
     .filter((entry) => entry.avgScore >= 1)
@@ -187,7 +187,7 @@ function findTopics(videos: AnalyzedVideo[], db: Database): Topic[] {
     const words = entry.term.split(' ');
     if (chosen.some((item) => item.term.split(' ').includes(entry.term)) || words.every((word) => chosen.some((picked) => picked.term === word))) continue;
     chosen.push({ ...entry, covered: db.pautas.some((pauta) => matchesQuery(`${pauta.title} ${pauta.promise} ${pauta.tags.join(' ')}`, entry.label)) });
-    if (chosen.length === 8) break;
+    if (chosen.length === limit) break;
   }
   return chosen;
 }
