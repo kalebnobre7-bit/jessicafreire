@@ -11,8 +11,8 @@ import { matchesQuery } from '@/lib/analytics';
 import { REFERENCE_KINDS, REFERENCE_KIND_LABEL, STAGE_LABEL } from '@/lib/constants';
 import { createId, createPauta, parseVideoId } from '@/lib/database';
 import { formatAge } from '@/lib/format';
-import { deleteFile, writeBinary } from '@/lib/github';
-import { compressImage, rememberImage } from '@/lib/images';
+import { deleteImage, uploadImage } from '@/lib/api';
+import { compressImage } from '@/lib/images';
 import type { Reference, ReferenceKind } from '@/lib/types';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
@@ -70,8 +70,7 @@ function Composer() {
       let imagePath: string | null = null;
       if (image) {
         imagePath = `refs/${id}.webp`;
-        await writeBinary(imagePath, image.base64, 'Adiciona print à biblioteca');
-        rememberImage(imagePath, image.previewUrl);
+        await uploadImage(imagePath, image.base64);
       }
       const [firstLine = '', ...rest] = trimmed.split('\n');
       const reference: Reference = {
@@ -196,7 +195,7 @@ function ReferenceCard({ reference }: { reference: Reference }) {
       draftDb.references = draftDb.references.filter((item) => item.id !== reference.id);
       for (const pauta of draftDb.pautas) pauta.referenceIds = pauta.referenceIds.filter((item) => item !== reference.id);
     });
-    if (reference.image) void deleteFile(reference.image, 'Remove print da biblioteca').catch(() => undefined);
+    if (reference.image) void deleteImage(reference.image).catch(() => undefined);
     toast('Removido da biblioteca.');
   };
 

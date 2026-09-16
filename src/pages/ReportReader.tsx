@@ -13,7 +13,7 @@ export function ReportReader() {
   const { id } = useParams();
   const [params] = useSearchParams();
   const navigate = useNavigate();
-  const { db, analysis, connected, ready, mode } = useData();
+  const { db, analysis, connected, ready } = useData();
   const { resolvedTheme, setTheme } = useUi();
 
   const reports = db.reports.filter((report) => report.status === 'publicado').sort((a, b) => b.to.localeCompare(a.to));
@@ -36,7 +36,7 @@ export function ReportReader() {
     <div className="min-h-dvh bg-canvas">
       <header className="no-print sticky top-0 z-20 border-b border-line bg-panel">
         <div className="mx-auto flex h-14 max-w-3xl items-center gap-3 px-4">
-          {mode === 'editor' && connected ? (
+          {connected ? (
             <Link to="/relatorios" className="inline-flex items-center gap-1.5 text-[13px] text-ink-2 hover:text-ink">
               <ArrowLeft size={16} aria-hidden /> Painel
             </Link>
@@ -77,7 +77,7 @@ export function ReportReader() {
   if (!ready) return shell(<Skeleton className="h-[600px]" />);
   if (!report) {
     return shell(
-      <EmptyState icon={FileChartColumn} title="Nenhum relatório publicado ainda" action={mode === 'editor' ? <Button onClick={() => navigate('/relatorios')}>Ir para relatórios</Button> : undefined}>
+      <EmptyState icon={FileChartColumn} title="Nenhum relatório publicado ainda" action={<Button onClick={() => navigate('/relatorios')}>Ir para relatórios</Button>}>
         Assim que um relatório for publicado, ele aparece aqui.
       </EmptyState>,
     );

@@ -8,7 +8,6 @@ import { Field, Input, Textarea } from '@/components/ui/form';
 import { ConfirmDialog, Menu } from '@/components/ui/overlay';
 import { buildInsights, buildSnapshot } from '@/lib/analytics';
 import { dateKey, formatAge, formatCompact, formatScore, shiftDate } from '@/lib/format';
-import { readerLink } from '@/lib/github';
 import type { Report, ReportSnapshot } from '@/lib/types';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
@@ -82,14 +81,8 @@ export function ReportEditor() {
   };
 
   const copyLink = async () => {
-    const link = readerLink();
-    if (!link) {
-      toast('Configure o acesso de leitura da Jéssica em Configurações.', 'error');
-      navigate('/config#leitura');
-      return;
-    }
-    await navigator.clipboard.writeText(link);
-    toast('Link da Jéssica copiado.');
+    await navigator.clipboard.writeText(`${window.location.origin}${window.location.pathname}#/r/${report.id}`);
+    toast('Link do relatório copiado. Quem abrir precisa entrar com a senha.');
   };
 
   return (
@@ -102,7 +95,7 @@ export function ReportEditor() {
           {published ? <Badge tone="up">Publicado {report.publishedAt ? formatAge(report.publishedAt) : ''}</Badge> : <Badge>Rascunho</Badge>}
           {published ? (
             <Button icon={Copy} onClick={() => void copyLink()}>
-              Copiar link da Jéssica
+              Copiar link
             </Button>
           ) : null}
           {published ? (

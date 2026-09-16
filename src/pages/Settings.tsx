@@ -1,14 +1,12 @@
-import { Check, Copy, ExternalLink, KeyRound, LogOut, RefreshCw, Trash2 } from 'lucide-react';
-import { useEffect, useState, type FormEvent, type ReactNode } from 'react';
+import { ExternalLink, LogOut, RefreshCw } from 'lucide-react';
+import { useEffect, type ReactNode } from 'react';
 import { useLocation } from 'react-router';
 import { SyncIndicator } from '@/components/layout/SyncIndicator';
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/feedback';
 import { Field, Input, SegmentedControl } from '@/components/ui/form';
-import { ConfirmDialog } from '@/components/ui/overlay';
 import { DATA_REPO } from '@/lib/constants';
 import { formatAge, formatDate } from '@/lib/format';
-import { getReaderToken, getToken, readFile, readerLink, saveReaderToken } from '@/lib/github';
 import { useCollect } from '@/hooks/useCollect';
 import { useData } from '@/store/data';
 import { useUi, type ThemePreference } from '@/store/ui';
@@ -25,95 +23,32 @@ function Section({ id, title, description, children }: { id?: string; title: str
   );
 }
 
-function mask(token: string | null): string {
-  return token ? `${token.slice(0, 11)}…${token.slice(-4)}` : '—';
-}
-
 export function Settings() {
-  const { db, metrics, mutate, connect, disconnect } = useData();
-  const { theme, setTheme, toast } = useUi();
+  const { db, metrics, mutate, signOut } = useData();
+  const { theme, setTheme } = useUi();
   const { collect, collecting } = useCollect();
   const location = useLocation();
-  const [newToken, setNewToken] = useState('');
-  const [switching, setSwitching] = useState(false);
-  const [confirmDisconnect, setConfirmDisconnect] = useState(false);
-  const [readerInput, setReaderInput] = useState('');
-  const [readerLinkValue, setReaderLinkValue] = useState(readerLink);
-  const [checkingReader, setCheckingReader] = useState(false);
-  const [copied, setCopied] = useState(false);
 
   useEffect(() => {
     if (location.hash) document.getElementById(location.hash.slice(1))?.scrollIntoView();
   }, [location.hash]);
 
-  const switchToken = async (event: FormEvent) => {
-    event.preventDefault();
-    setSwitching(true);
-    const ok = await connect(newToken.trim());
-    setSwitching(false);
-    if (ok) {
-      setNewToken('');
-      toast('Token atualizado.');
-    } else {
-      toast('Esse token não tem acesso ao banco. O anterior continua ativo.', 'error');
-    }
-  };
-
-  const saveReader = async (event: FormEvent) => {
-    event.preventDefault();
-    const token = readerInput.trim();
-    if (token === getToken()) {
-      toast('Esse é o seu token de edição. Crie um token separado, só de leitura.', 'error');
-      return;
-    }
-    setCheckingReader(true);
-    try {
-      await readFile('db.json', token);
-      saveReaderToken(token);
-      setReaderLinkValue(readerLink());
-      setReaderInput('');
-      toast('Acesso de leitura configurado.');
-    } catch {
-      toast('Esse token não consegue ler o jessicafreire-data.', 'error');
-    } finally {
-      setCheckingReader(false);
-    }
-  };
-
-  const copyReader = async () => {
-    if (!readerLinkValue) return;
-    await navigator.clipboard.writeText(readerLinkValue);
-    setCopied(true);
-    window.setTimeout(() => setCopied(false), 2000);
-  };
-
   return (
     <>
       <PageHeader title="Configurações" />
       <div className="rounded-xl border border-line bg-panel px-5 py-7 sm:px-8">
-        <Section title="Banco de dados" description={<>Pautas, relatórios e canais ficam no repositório privado <b className="font-medium text-ink">{DATA_REPO.split('/')[1]}</b>, salvos a cada alteração. A senha de acesso destrava esse acesso em cada aparelho.</>}>
+        <Section title="Acesso" description="Quem entra com a senha usa o painel inteiro. O acesso ao GitHub fica no servidor do painel, nunca no navegador.">
           <div className="flex flex-wrap items-center justify-between gap-3 rounded-lg bg-sunken px-4 py-3">
-            <div>
-              <SyncIndicator withLabel />
-              <p className="mt-0.5 pl-2.5 font-mono text-2xs text-ink-3">{mask(getToken())}</p>
-            </div>
+            <SyncIndicator withLabel />
             <a href={`https://github.com/${DATA_REPO}`} target="_blank" rel="noreferrer" className="inline-flex items-center gap-1 text-[13px] text-info hover:underline">
-              Abrir repositório <ExternalLink size={13} aria-hidden />
+              Abrir repositório de dados <ExternalLink size={13} aria-hidden />
             </a>
           </div>
           <p className="mt-4 text-[13px] text-ink-2">
-            Para trocar a senha de acesso, rode <code className="rounded bg-sunken px-1 py-0.5 text-xs">npm run senha</code> no projeto e publique. Quem já entrou continua conectado.
+            Para trocar a senha, mude a variável <code className="rounded bg-sunken px-1 py-0.5 text-xs">APP_PASSWORD</code> nas configurações do projeto na Vercel e publique de novo. Quem já entrou continua entrando até sair.
           </p>
-          <form onSubmit={switchToken} className="mt-4 flex flex-col gap-2 sm:flex-row sm:items-end">
-            <Field label="Trocar token (manutenção)" className="flex-1">
-              <Input type="password" autoComplete="off" value={newToken} onChange={(event) => setNewToken(event.target.value)} placeholder="github_pat_..." />
-            </Field>
-            <Button type="submit" icon={KeyRound} loading={switching} disabled={!newToken.trim()}>
-              Trocar
-            </Button>
-          </form>
-          <Button variant="danger" icon={LogOut} size="sm" className="mt-3 -ml-2.5" onClick={() => setConfirmDisconnect(true)}>
-            Desconectar este navegador
+          <Button variant="danger" icon={LogOut} size="sm" className="mt-3 -ml-2.5" onClick={signOut}>
+            Sair deste aparelho
           </Button>
         </Section>
 
@@ -126,61 +61,6 @@ export function Settings() {
               <Input value={db.profile.handle} onChange={(event) => mutate((draft) => void (draft.profile.handle = event.target.value.trim()))} />
             </Field>
           </div>
-        </Section>
-
-        <Section
-          id="leitura"
-          title="Link da Jéssica"
-          description="A Jéssica abre só os relatórios publicados, sem menu e sem edição. Use um token separado, só de leitura, para poder revogar sem afetar o seu."
-        >
-          {readerLinkValue ? (
-            <div className="space-y-3">
-              <div className="flex items-center gap-2 rounded-lg bg-sunken p-2 pl-3">
-                <p className="min-w-0 flex-1 truncate font-mono text-xs text-ink-2">{readerLinkValue.replace(/acesso=.*/, 'acesso=••••••')}</p>
-                <Button size="sm" icon={copied ? Check : Copy} onClick={() => void copyReader()}>
-                  {copied ? 'Copiado' : 'Copiar link'}
-                </Button>
-              </div>
-              <p className="text-xs text-ink-2">Mande pelo WhatsApp. Para testar, abra numa janela anônima: abrir aqui troca este navegador para o modo leitura.</p>
-              <Button
-                variant="danger"
-                size="sm"
-                icon={Trash2}
-                className="-ml-2.5"
-                onClick={() => {
-                  saveReaderToken(null);
-                  setReaderLinkValue(null);
-                  toast('Link removido deste navegador. Revogue o token no GitHub para cortar o acesso.');
-                }}
-              >
-                Remover link
-              </Button>
-            </div>
-          ) : (
-            <>
-              <ol className="mb-4 list-decimal space-y-1.5 pl-4 text-[13px] text-ink-2">
-                <li>
-                  Crie um{' '}
-                  <a className="text-info hover:underline" href="https://github.com/settings/personal-access-tokens/new" target="_blank" rel="noreferrer">
-                    token fine-grained
-                  </a>{' '}
-                  chamado "Jéssica leitura"
-                </li>
-                <li>Repository access: só o jessicafreire-data</li>
-                <li>
-                  Permissions: <b className="font-medium text-ink">Contents: Read-only</b> (nada mais)
-                </li>
-              </ol>
-              <form onSubmit={saveReader} className="flex flex-col gap-2 sm:flex-row sm:items-end">
-                <Field label="Token só leitura" className="flex-1" hint={getReaderToken() ? undefined : 'Fica salvo só neste navegador, para gerar o link.'}>
-                  <Input type="password" autoComplete="off" value={readerInput} onChange={(event) => setReaderInput(event.target.value)} placeholder="github_pat_..." />
-                </Field>
-                <Button type="submit" variant="primary" loading={checkingReader} disabled={!readerInput.trim()} className="sm:mb-5">
-                  Gerar link
-                </Button>
-              </form>
-            </>
-          )}
         </Section>
 
         <Section title="Coleta de métricas" description="Um GitHub Actions busca inscritos, views totais e os últimos 15 vídeos de cada canal, sem chave de API.">
@@ -238,15 +118,6 @@ export function Settings() {
           />
         </Section>
       </div>
-
-      <ConfirmDialog
-        open={confirmDisconnect}
-        onClose={() => setConfirmDisconnect(false)}
-        title="Desconectar este navegador?"
-        description="O token e a cópia local dos dados saem deste navegador. O banco no GitHub continua intacto."
-        confirmLabel="Desconectar"
-        onConfirm={disconnect}
-      />
     </>
   );
 }

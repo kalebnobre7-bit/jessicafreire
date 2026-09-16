@@ -1,8 +1,12 @@
-name: Publicar no GitHub Pages
+name: Redirecionar o GitHub Pages
+
+# O painel mudou para a Vercel (jessicafreire.vercel.app), porque agora tem servidor
+# para a entrada por senha. O Pages só serve a página de redirecionamento.
 
 on:
   push:
     branches: [main]
+    paths: ['pages-redirect/**', '.github/workflows/deploy.yml']
   workflow_dispatch:
 
 permissions:
@@ -15,26 +19,15 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v5
-      - uses: actions/setup-node@v5
-        with:
-          node-version: 24
-          cache: npm
-      - run: npm ci
-      - run: npm run build
-      - uses: actions/upload-pages-artifact@v4
-        with:
-          path: dist
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v5
+      - uses: actions/upload-pages-artifact@v4
+        with:
+          path: pages-redirect
       - id: deployment
         uses: actions/deploy-pages@v4

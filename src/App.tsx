@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { HashRouter, Navigate, Route, Routes } from 'react-router';
+import { HashRouter, Route, Routes } from 'react-router';
 import { AppShell } from './components/layout/AppShell';
 import { ChannelDetail } from './pages/ChannelDetail';
 import { Connect } from './pages/Connect';
@@ -25,17 +25,11 @@ function DataLayer({ children }: { children: ReactNode }) {
 }
 
 function AppRoutes() {
-  const { connected, mode } = useData();
+  const { connected, ready } = useData();
 
-  // Link da Jéssica: só o relatório, sem menu e sem edição
-  if (mode === 'leitura' || !connected) {
-    return (
-      <Routes>
-        <Route path="/r" element={<ReportReader />} />
-        <Route path="/r/:id" element={<ReportReader />} />
-        <Route path="*" element={mode === 'leitura' ? <Navigate to="/r" replace /> : <Connect />} />
-      </Routes>
-    );
+  if (!connected) {
+    // Enquanto confere a sessão, evita piscar a tela de entrada
+    return ready ? <Connect /> : null;
   }
 
   return (

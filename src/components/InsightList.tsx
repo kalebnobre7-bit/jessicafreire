@@ -1,7 +1,6 @@
 import { Flame, Info, Lightbulb, TrendingDown, TrendingUp, type LucideIcon } from 'lucide-react';
 import type { Insight } from '@/lib/analytics';
 import { useInsightAction } from '@/hooks/useInsightAction';
-import { useData } from '@/store/data';
 
 const TONES: Record<Insight['tone'], { icon: LucideIcon; className: string }> = {
   up: { icon: TrendingUp, className: 'bg-up-soft text-up' },
@@ -13,7 +12,6 @@ const TONES: Record<Insight['tone'], { icon: LucideIcon; className: string }> = 
 
 export function InsightList({ insights, limit }: { insights: Insight[]; limit?: number }) {
   const runAction = useInsightAction();
-  const { mode } = useData();
   const visible = limit ? insights.slice(0, limit) : insights;
   return (
     <ul className="divide-y divide-line">
@@ -27,7 +25,7 @@ export function InsightList({ insights, limit }: { insights: Insight[]; limit?: 
             <div className="min-w-0 flex-1">
               <p className="text-sm font-medium text-ink">{insight.title}</p>
               <p className="mt-0.5 text-[13px] leading-relaxed text-ink-2">{insight.text}</p>
-              {insight.actions.length && mode === 'editor' ? (
+              {insight.actions.length ? (
                 <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1">
                   {insight.actions.map((action) => (
                     <button key={action.type} type="button" onClick={() => runAction(action)} className="text-[13px] font-medium text-info hover:underline">

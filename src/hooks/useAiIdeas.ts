@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useState } from 'react';
-import { GitHubError, isAuthError, readRawFile, startWorkflow } from '@/lib/github';
+import { ApiError, isAuthError, readDataFile, startWorkflow } from '@/lib/api';
 import type { AiRun } from '@/lib/types';
 
 const wait = (ms: number) => new Promise((resolve) => setTimeout(resolve, ms));
@@ -10,9 +10,9 @@ let generatingSince: number | null = null;
 
 async function readRuns(): Promise<AiRun[]> {
   try {
-    return ((await readRawFile('ai-ideas.json')) as { runs: AiRun[] }).runs;
+    return (await readDataFile<{ runs: AiRun[] }>('ideas')).runs;
   } catch (error) {
-    if (error instanceof GitHubError && error.status === 404) return [];
+    if (error instanceof ApiError && error.status === 404) return [];
     throw error;
   }
 }
