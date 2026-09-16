@@ -62,9 +62,3 @@ export async function github(path: string, init: RequestInit = {}, accept = 'app
     },
   });
 }
-
-export async function forward(response: VercelResponse, upstream: Response): Promise<void> {
-  const body = await upstream.text();
-  response.status(upstream.ok ? upstream.status : upstream.status).setHeader('Cache-Control', 'no-store');
-  response.send(body);
-}
