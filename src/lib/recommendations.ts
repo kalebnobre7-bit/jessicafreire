@@ -1,21 +1,11 @@
 // Sugestões de vídeos para gravar calculadas a partir dos dados (sem IA): radar, canal, pautas e biblioteca.
-import { findTopics, toWords, type Analysis } from './analytics';
+import { findTopics, isRelevantRadarVideo, type Analysis } from './analytics';
 import { formatAge, formatCompact, formatScore } from './format';
 import type { Database, Pauta } from './types';
 
 const DAY = 86_400_000;
 const LIBRARY_STALE_DAYS = 5;
 const KNOWN_TERMS: Record<string, string> = { ia: 'IA', tiktok: 'TikTok', chatgpt: 'ChatGPT', youtube: 'YouTube', shopee: 'Shopee', instagram: 'Instagram', google: 'Google', pov: 'POV', ugc: 'UGC' };
-const RADAR_RELEVANCE_TERMS = new Set([
-  'ia', 'ai', 'tiktok', 'shop', 'shopee', 'chatgpt', 'gpt', 'claude', 'gemini', 'video', 'videos',
-  'conteudo', 'youtube', 'ugc', 'pov', 'prompt', 'afiliado', 'afiliados', 'influenciadora', 'influencer',
-  'automacao', 'automaticas', 'ferramenta', 'ferramentas', 'canal', 'viral', 'venda', 'vender', 'produto',
-]);
-
-function isRelevantRadarVideo(title: string): boolean {
-  return toWords(title).some((word) => RADAR_RELEVANCE_TERMS.has(word));
-}
-
 export type RecommendationKind = 'ritmo' | 'adaptar' | 'repetir' | 'seu-tema' | 'tema' | 'biblioteca';
 
 export interface Recommendation {
@@ -68,7 +58,7 @@ export function buildRecommendations(analysis: Analysis | null, db: Database, no
     }
   }
 
-  for (const video of (analysis?.trending ?? []).filter((item) => (item.score ?? 0) >= 1.5 && isRelevantRadarVideo(item.title) && !referencedVideoIds.has(item.id)).slice(0, 5)) {
+  for (const video of (analysis?.trending ?? []).filter((item) => (item.score ?? 0) >= 1.5 && isRelevantRadarVideo(item) && !referencedVideoIds.has(item.id)).slice(0, 5)) {
     const score = video.score ?? 0;
     list.push({
       id: `adaptar-${video.id}`,

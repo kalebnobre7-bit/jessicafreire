@@ -8,6 +8,11 @@ const STOPWORDS = new Set(
   'a o as os um uma uns umas de da do das dos e em no na nos nas para pra pro pros com sem por que se me te eu voce voces ele ela eles elas isso isto esse essa este esta meu minha meus seu sua seus como mais muito ao aos ja so nao sim foi fiz faz vai vou tem ter ser era sao ate agora aqui quem qual quando onde dia dias usando sobre tudo todo toda cada nunca sempre the of to and in on for with you your my is are how what this that'.split(' '),
 );
 const SHORT_TERMS = new Set(['ia', 'ai']);
+const RADAR_RELEVANCE_TERMS = new Set([
+  'ia', 'ai', 'tiktok', 'shop', 'shopee', 'chatgpt', 'gpt', 'claude', 'gemini', 'video', 'videos',
+  'conteudo', 'youtube', 'ugc', 'pov', 'prompt', 'afiliado', 'afiliados', 'influenciadora', 'influencer',
+  'automacao', 'automaticas', 'ferramenta', 'ferramentas', 'canal', 'viral', 'venda', 'vender', 'produto',
+]);
 
 export interface Point {
   date: string;
@@ -72,6 +77,9 @@ export interface Analysis {
 
 export function toWords(text: string): string[] {
   return text.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/\p{M}/gu, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
+}
+export function isRelevantRadarVideo(video: Pick<AnalyzedVideo, 'title'>): boolean {
+  return toWords(video.title).some((word) => RADAR_RELEVANCE_TERMS.has(word));
 }
 // Busca por início de palavra, sem acento: "ia" não casa com "ideia", "video" casa com "Vídeos"
 export function matchesQuery(text: string, query: string): boolean {
@@ -216,6 +224,7 @@ export function analyzeMetrics(metrics: Metrics, db: Database, now = Date.now())
   const profile = channels.get(db.profile.handle.toLowerCase()) ?? null;
   const radar = db.channels.map((channel) => channels.get(channel.handle.toLowerCase())).filter((channel): channel is AnalyzedChannel => Boolean(channel));
   const radarVideos = radar.flatMap((channel) => channel.videos);
+  const relevantRadarVideos = radarVideos.filter(isRelevantRadarVideo);
   return {
     updatedAt: metrics.updatedAt,
     channels,
@@ -223,7 +232,7 @@ export function analyzeMetrics(metrics: Metrics, db: Database, now = Date.now())
     radar,
     videoById: new Map([...channels.values()].flatMap((channel) => channel.videos.map((video) => [video.id, video] as const))),
     trending: radarVideos.filter((video) => video.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    topics: findTopics(radarVideos, db),
+    topics: findTopics(relevantRadarVideos, db),
   };
 }
 
@@ -299,7 +308,7 @@ export function buildInsights(analysis: Analysis, db: Database, now = Date.now()
     if (oldest) insights.push({ id: 'stalled', tone: 'neutral', title: `${stalled.length} ${stalled.length === 1 ? 'pauta parada' : 'pautas paradas'}`, text: `"${oldest.title}" não é mexida ${formatAge(oldest.updatedAt, now)}.`, actions: [{ type: 'open-pauta', label: 'Abrir pauta', pautaId: oldest.id }] });
   }
 
-  for (const video of analysis.trending.filter((item) => (item.score ?? 0) >= 2).slice(0, 2)) {
+  for (const video of analysis.trending.filter((item) => (item.score ?? 0) >= 2 && isRelevantRadarVideo(item)).slice(0, 2)) {
     const saved = db.references.some((reference) => reference.videoId === video.id);
     insights.push({
       id: `trend-${video.id}`,

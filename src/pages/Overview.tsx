@@ -7,7 +7,7 @@ import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge, Delta, EmptyState, PageHeader, Panel, ScoreBadge, ScoreBar, Skeleton } from '@/components/ui/feedback';
 import { SegmentedControl } from '@/components/ui/form';
 import { Avatar, Thumb } from '@/components/ui/media';
-import { buildInsights, dailyGains, valueAt, valueFrom, type AnalyzedChannel, type Point } from '@/lib/analytics';
+import { buildInsights, dailyGains, isRelevantRadarVideo, valueAt, valueFrom, type AnalyzedChannel, type Point } from '@/lib/analytics';
 import { STAGE_LABEL } from '@/lib/constants';
 import { buildRecommendations, RECOMMENDATION_LABEL } from '@/lib/recommendations';
 import { dateKey, formatAge, formatCompact, formatDate, formatNumber, formatPercent, shiftDate } from '@/lib/format';
@@ -228,7 +228,7 @@ function TopVideos({ profile }: { profile: AnalyzedChannel }) {
 
 function RadarHighlights() {
   const { analysis } = useData();
-  const trending = (analysis?.trending ?? []).slice(0, 4);
+  const trending = (analysis?.trending ?? []).filter(isRelevantRadarVideo).slice(0, 4);
   return (
     <Panel title="Em alta no radar" description="Acima da mediana do próprio canal" actions={<ButtonLink to="/radar" variant="ghost" size="sm">Abrir radar</ButtonLink>}>
       {trending.length ? (
