@@ -138,7 +138,7 @@ function ChannelRow({ label, handle, channel, you }: { label: string; handle: st
 }
 
 function Channels() {
-  const { db, analysis, mutate, connected } = useData();
+  const { db, analysis, mutate, saveNow, connected } = useData();
   const { collect, collecting } = useCollect();
   const { toast } = useUi();
   const navigate = useNavigate();
@@ -254,9 +254,11 @@ function Channels() {
         title="Remover canal do radar?"
         description={`${removingChannel?.name ?? ''} sai da comparação e da coleta. O histórico coletado some na próxima coleta.`}
         confirmLabel="Remover"
-        onConfirm={() => {
+        onConfirm={async () => {
           mutate((draft) => void (draft.channels = draft.channels.filter((channel) => channel.id !== removing)));
-          toast('Canal removido do radar.');
+          const saved = await saveNow();
+          toast(saved ? 'Canal removido do radar.' : 'Não foi possível salvar a remoção.', saved ? undefined : 'error');
+          return saved;
         }}
       />
     </>

@@ -92,19 +92,25 @@ export function Dialog({ open, onClose, title, children, className = '' }: { ope
   );
 }
 
-export function ConfirmDialog({ open, title, description, confirmLabel, onConfirm, onClose }: { open: boolean; title: string; description: ReactNode; confirmLabel: string; onConfirm: () => void; onClose: () => void }) {
+export function ConfirmDialog({ open, title, description, confirmLabel, onConfirm, onClose }: { open: boolean; title: string; description: ReactNode; confirmLabel: string; onConfirm: () => boolean | void | Promise<boolean | void>; onClose: () => void }) {
+  const [confirming, setConfirming] = useState(false);
   return (
     <Dialog open={open} onClose={onClose} title={title}>
       <p className="text-sm text-ink-2">{description}</p>
       <div className="mt-5 flex justify-end gap-2">
-        <Button variant="ghost" onClick={onClose}>
+        <Button variant="ghost" onClick={onClose} disabled={confirming}>
           Cancelar
         </Button>
         <Button
           variant="primary"
-          onClick={() => {
-            onConfirm();
-            onClose();
+          loading={confirming}
+          onClick={async () => {
+            setConfirming(true);
+            try {
+              if ((await onConfirm()) !== false) onClose();
+            } finally {
+              setConfirming(false);
+            }
           }}
         >
           {confirmLabel}

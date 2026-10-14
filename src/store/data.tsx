@@ -20,6 +20,7 @@ interface DataContextValue {
   sync: SyncStatus;
   collecting: boolean;
   mutate: (recipe: (draft: Database) => void) => void;
+  saveNow: () => Promise<boolean>;
   // Banco mais recente, inclusive mutações do mesmo clique que ainda não renderizaram
   getDb: () => Database;
   signIn: (password: string) => Promise<'ok' | 'senha' | 'limite' | 'erro'>;
@@ -94,9 +95,9 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
     }
   }, []);
 
-  const pushDb = useCallback(async (): Promise<void> => {
+  const pushDb = useCallback(async (): Promise<boolean> => {
     window.clearTimeout(timerRef.current);
-    if (savingRef.current || !dirtyRef.current || !connectedRef.current) return;
+    if (savingRef.current || !dirtyRef.current || !connectedRef.current) return false;
     savingRef.current = true;
     dirtyRef.current = false;
     setSync('saving');
@@ -109,6 +110,7 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
       } else {
         setSync('saved');
       }
+      return true;
     } catch (error) {
       savingRef.current = false;
       if (error instanceof ApiError && (error.status === 409 || error.status === 422)) {
@@ -118,15 +120,16 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
           dirtyRef.current = true;
           setSync('pending');
           timerRef.current = window.setTimeout(pushDb, 1500);
-          return;
+          return false;
         }
         // Outro aparelho salvou antes: fica com a versão do banco para não sobrescrever o trabalho de ninguém
         await pullDb(true);
         onConflict();
-        return;
+        return false;
       }
       dirtyRef.current = true;
       setSync(isAuthError(error) ? 'auth' : 'error');
+      return false;
     }
   }, [onConflict, pullDb]);
 
@@ -194,6 +197,12 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
 
   const getDb = useCallback(() => dbRef.current, []);
 
+  const saveNow = useCallback(async (): Promise<boolean> => {
+    if (!connectedRef.current) return false;
+    while (savingRef.current) await wait(50);
+    return dirtyRef.current ? pushDb() : true;
+  }, [pushDb]);
+
   const retrySave = useCallback(() => {
     dirtyRef.current = true;
     void pushDb();
@@ -230,8 +239,8 @@ export function DataProvider({ children, onConflict }: { children: ReactNode; on
   const analysis = useMemo(() => (metrics ? analyzeMetrics(metrics, db) : null), [metrics, db]);
 
   const value = useMemo<DataContextValue>(
-    () => ({ db, metrics, analysis, connected, ready, sync, collecting, mutate, getDb, signIn, signOut, collect, retrySave }),
-    [db, metrics, analysis, connected, ready, sync, collecting, mutate, getDb, signIn, signOut, collect, retrySave],
+    () => ({ db, metrics, analysis, connected, ready, sync, collecting, mutate, saveNow, getDb, signIn, signOut, collect, retrySave }),
+    [db, metrics, analysis, connected, ready, sync, collecting, mutate, saveNow, getDb, signIn, signOut, collect, retrySave],
   );
 
   return <DataContext value={value}>{children}</DataContext>;
