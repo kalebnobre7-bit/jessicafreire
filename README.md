@@ -26,7 +26,7 @@ As tentativas de login são limitadas por IP (8 a cada 10 minutos).
 - **[jessicafreire-data](https://github.com/kalebnobre7-bit/jessicafreire-data) (privado)** é o banco:
   - `db.json`: pautas, roteiros, biblioteca, canais e relatórios.
   - `metrics.json`: inscritos, views totais e os últimos 15 vídeos de cada canal, com histórico de 180 dias. Coletado sem chave de API por um Actions às 06h e 18h.
-  - `ai-ideas.json`: ideias geradas pelo Claude (workflow `recommend.yml`, chave no secret `ANTHROPIC_API_KEY`).
+  - `ai-ideas.json`: ideias extraídas dos vídeos acima da mediana. O sistema funciona sem chave externa e pode usar o Claude para refinar a rodada quando `ANTHROPIC_API_KEY` estiver configurada.
   - `refs/`: prints salvos na biblioteca.
 
 ## Páginas

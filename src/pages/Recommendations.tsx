@@ -136,10 +136,10 @@ function AiSection() {
     <Panel
       title={
         <span className="flex items-center gap-2">
-          <Sparkles size={17} className="text-accent" aria-hidden /> Ideias com IA
+          <Sparkles size={17} className="text-accent" aria-hidden /> Ideias para gravar
         </span>
       }
-      description="O Claude lê o canal da Jéssica, os concorrentes, as pautas e a biblioteca, e sugere vídeos com título, gancho e ângulo"
+      description="O sistema cruza o canal da Jéssica com os vídeos acima da média no radar e entrega título, gancho, ângulo e referência"
     >
       <form onSubmit={submit} className="flex flex-col gap-2 sm:flex-row">
         <Input value={focus} onChange={(event) => setFocus(event.target.value)} placeholder="Foco opcional: ex. IA grátis para TikTok Shop, vídeos sem aparecer" aria-label="Foco da rodada" className="flex-1" />
@@ -172,6 +172,7 @@ function AiSection() {
           <>
             <p className="text-xs text-ink-3">
               Rodada de {formatDate(lastOk.createdAt, { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+              {lastOk.source === 'dados' ? ' · extraída dos dados do radar' : lastOk.source === 'claude' ? ' · refinada com IA' : ''}
               {lastOk.focus ? ` · foco: ${lastOk.focus}` : ''} · {visible.length} de {lastOk.ideas.length} ideias abertas
             </p>
             {visible.length ? (

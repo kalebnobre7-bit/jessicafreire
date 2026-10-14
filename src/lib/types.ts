@@ -134,6 +134,7 @@ export interface AiRun {
   id: string;
   createdAt: string;
   focus: string;
+  source?: 'dados' | 'claude';
   status: 'ok' | 'error';
   error?: string;
   ideas: AiIdea[];
