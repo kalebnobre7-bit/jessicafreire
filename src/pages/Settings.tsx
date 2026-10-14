@@ -63,7 +63,7 @@ export function Settings() {
           </div>
         </Section>
 
-        <Section title="Coleta de métricas" description="Um GitHub Actions busca inscritos, views totais e os últimos 15 vídeos de cada canal, sem chave de API.">
+        <Section title="Coleta de métricas" description="Um GitHub Actions busca inscritos e views totais de cada canal, o histórico de vídeos longos da Jéssica e os últimos 15 vídeos do radar, sem chave de API.">
           <dl className="grid grid-cols-2 gap-3 text-sm">
             <div className="rounded-lg bg-sunken px-4 py-3">
               <dt className="text-xs text-ink-2">Última coleta</dt>

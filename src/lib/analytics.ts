@@ -133,9 +133,10 @@ export function dailyGains(series: Point[]): Point[] {
 function analyzeChannel(channel: ChannelMetrics, history: Metrics['history'][string] | undefined, now: number): AnalyzedChannel {
   const yesterday = dateKey(now - DAY);
   const base = channel.videos.map((video) => ({ ...video, ageDays: (now - Date.parse(video.published)) / DAY }));
-  const mature = base.filter((video) => video.ageDays >= MATURE_DAYS);
-  // Mediana de views do canal: referência para dizer se um vídeo foi bem ou mal
-  const baseline = median((mature.length >= 3 ? mature : base).map((video) => video.views));
+  const recent = base.slice(0, 15);
+  const mature = recent.filter((video) => video.ageDays >= MATURE_DAYS);
+  // A referência fica nos últimos 15 para não distorcer a leitura atual com o catálogo antigo.
+  const baseline = median((mature.length >= 3 ? mature : recent).map((video) => video.views));
   const videos: AnalyzedVideo[] = base.map((video) => {
     const series = toSeries(history?.views[video.id]);
     const previous = valueAt(series, yesterday);
@@ -149,7 +150,7 @@ function analyzeChannel(channel: ChannelMetrics, history: Metrics['history'][str
       series,
     };
   });
-  const gaps = base.slice(0, -1).map((video, index) => (Date.parse(video.published) - Date.parse(base[index + 1]?.published ?? video.published)) / DAY);
+  const gaps = recent.slice(0, -1).map((video, index) => (Date.parse(video.published) - Date.parse(recent[index + 1]?.published ?? video.published)) / DAY);
   const first = base[0];
   return {
     ...channel,

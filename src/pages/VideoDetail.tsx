@@ -27,7 +27,7 @@ export function VideoDetail() {
     return (
       <Panel>
         <EmptyState icon={SquareKanban} title="Vídeo fora da coleta" action={<ButtonLink to="/videos">Voltar para vídeos</ButtonLink>}>
-          O sistema acompanha os últimos 15 vídeos do canal. Esse vídeo não está mais no feed ou ainda não foi coletado.
+          Esse vídeo ainda não entrou no histórico coletado ou não está mais público no YouTube.
         </EmptyState>
       </Panel>
     );
@@ -47,7 +47,7 @@ export function VideoDetail() {
   const stats = [
     { label: 'Views', value: formatNumber(video.views), detail: video.gained24h == null ? 'ganho diário a partir do 2º dia' : `+${formatNumber(video.gained24h)} desde ontem` },
     { label: 'Likes', value: formatNumber(video.likes), detail: video.likeRate == null ? '' : `${formatPercent(video.likeRate)} das views` },
-    { label: 'Posição', value: `${position}º`, detail: `entre os últimos ${profile.videos.length}` },
+    { label: 'Posição', value: `${position}º`, detail: `entre ${profile.videos.length} vídeos coletados` },
     { label: 'Mediana do canal', value: formatCompact(profile.baseline), detail: video.score == null ? 'vídeo com menos de 3 dias' : `este vídeo: ${video.score.toLocaleString('pt-BR', { maximumFractionDigits: 1 })}x` },
   ];
 

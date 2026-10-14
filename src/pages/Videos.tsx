@@ -47,7 +47,7 @@ export function Videos() {
     <>
       <PageHeader
         title="Vídeos do canal"
-        description={profile ? `Últimos ${profile.videos.length} vídeos de ${db.profile.handle} · ${formatNumber(profile.videoCount)} no total · mediana de ${formatCompact(profile.baseline)} views` : 'Coleta pública dos últimos 15 vídeos'}
+        description={profile ? `${profile.videos.length} vídeos coletados de ${db.profile.handle} · ${formatNumber(profile.videoCount)} publicados no canal · mediana recente de ${formatCompact(profile.baseline)} views` : 'Coleta pública do histórico do canal'}
         actions={
           <div className="relative w-full sm:w-64">
             <Search size={16} className="pointer-events-none absolute top-1/2 left-3 -translate-y-1/2 text-ink-3" aria-hidden />
@@ -120,7 +120,7 @@ export function Videos() {
             {!videos.length ? <EmptyState icon={Search} title={`Nenhum vídeo com "${query}"`} /> : null}
           </div>
           <p className="border-t border-line px-5 py-3 text-2xs text-ink-3">
-            "vs. mediana" compara as views com a mediana do canal ({formatCompact(profile.baseline)}). A marca vertical é a mediana; vídeos com menos de 3 dias ficam de fora. "24h" precisa de pelo menos um dia de coleta.
+            "vs. mediana" compara as views com a mediana dos 15 vídeos mais recentes ({formatCompact(profile.baseline)}). A marca vertical é a mediana; vídeos com menos de 3 dias ficam de fora. "24h" e a curva de views passam a aparecer depois da coleta do vídeo.
           </p>
         </Panel>
       )}

@@ -1,7 +1,7 @@
-import { ArrowRight, CalendarDays, Heart, RefreshCw, Sparkles, SquareKanban, ThumbsUp, TrendingUp } from 'lucide-react';
+import { Activity, ArrowRight, CalendarDays, CircleDot, Heart, Layers3, Radio, RefreshCw, Sparkles, SquareKanban, Target, ThumbsUp, TrendingUp } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { Link } from 'react-router';
-import { LineChart } from '@/components/charts';
+import { LineChart, Sparkline } from '@/components/charts';
 import { InsightList } from '@/components/InsightList';
 import { Button, ButtonLink } from '@/components/ui/button';
 import { Badge, Delta, EmptyState, PageHeader, Panel, ScoreBadge, ScoreBar, Skeleton } from '@/components/ui/feedback';
@@ -10,13 +10,116 @@ import { Avatar, Thumb } from '@/components/ui/media';
 import { buildInsights, dailyGains, isRelevantRadarVideo, valueAt, valueFrom, type AnalyzedChannel, type Point } from '@/lib/analytics';
 import { STAGE_LABEL } from '@/lib/constants';
 import { buildRecommendations, RECOMMENDATION_LABEL } from '@/lib/recommendations';
-import { dateKey, formatAge, formatCompact, formatDate, formatNumber, formatPercent, shiftDate } from '@/lib/format';
+import { dateKey, formatAge, formatCompact, formatDate, formatNumber, formatPercent, formatScore, shiftDate } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
 import { useCreate } from '@/hooks/useCreate';
 import { useData } from '@/store/data';
 
-type Period = '7' | '28' | '90';
+type Period = '1' | '7' | '28' | '90';
 type MetricTab = 'views' | 'subscribers' | 'uploads';
+
+function ChannelPulse({ profile, insightCount, radarCount }: { profile: AnalyzedChannel; insightCount: number; radarCount: number }) {
+  const newest = profile.videos[0];
+  const winner = profile.top;
+  const cadence = profile.uploadEveryDays == null ? 'ainda calculando' : profile.uploadEveryDays < 1.5 ? 'diário' : `a cada ${Math.round(profile.uploadEveryDays)} dias`;
+  const recentVideos = profile.videos.slice(0, 15);
+  const recentAverage = recentVideos.length ? recentVideos.reduce((total, video) => total + video.views, 0) / recentVideos.length : 0;
+  const recentLikeRate = recentVideos.length ? recentVideos.reduce((total, video) => total + (video.likeRate ?? 0), 0) / recentVideos.length : null;
+  const metrics = [
+    { label: 'Inscritos', value: formatCompact(profile.subscribers), detail: 'base atual', points: profile.subscribersSeries },
+    { label: 'Views no canal', value: formatCompact(profile.totalViews), detail: `${formatNumber(profile.videoCount)} vídeos publicados`, points: profile.totalViewsSeries },
+    { label: 'Média recente', value: formatCompact(recentAverage), detail: 'nos últimos 15 vídeos', points: recentVideos.slice(0, 8).reverse().map((video) => ({ date: video.published, value: video.views })) },
+    { label: 'Ritmo de publicação', value: cadence, detail: profile.daysSinceUpload == null ? 'sem vídeo recente' : `último há ${Math.max(0, Math.floor(profile.daysSinceUpload))} dias`, points: [] },
+  ];
+
+  return (
+    <section className="relative overflow-hidden rounded-2xl bg-ink px-5 py-5 text-panel sm:px-7 sm:py-6 xl:col-span-3">
+      <div className="pointer-events-none absolute -top-24 -right-16 size-72 rounded-full bg-accent opacity-25 blur-3xl" aria-hidden />
+      <div className="pointer-events-none absolute right-28 bottom-0 h-24 w-px bg-panel/15" aria-hidden />
+      <div className="relative grid gap-6 xl:grid-cols-[minmax(0,1.25fr)_minmax(26rem,0.75fr)] xl:items-end">
+        <div>
+          <div className="flex items-center gap-2 text-xs font-medium tracking-[0.13em] text-panel/65 uppercase">
+            <Activity size={14} aria-hidden /> Pulso do canal
+          </div>
+          <div className="mt-3 flex flex-wrap items-end gap-x-3 gap-y-2">
+            <h2 className="text-2xl font-medium tracking-[-0.03em] sm:text-3xl">Sua leitura para decidir o próximo vídeo.</h2>
+            <span className="mb-1 inline-flex items-center gap-1.5 rounded-full bg-panel/12 px-2.5 py-1 text-xs text-panel/80">
+              <Radio size={13} aria-hidden /> {radarCount} canais no radar
+            </span>
+          </div>
+          <p className="mt-2 max-w-2xl text-sm leading-relaxed text-panel/70">
+            {winner ? <>O melhor sinal atual é <strong className="font-medium text-panel">“{winner.title}”</strong>, com {formatScore(winner.score ?? 0)} a mediana do canal.</> : 'Assim que houver vídeos maduros, o sistema compara o desempenho com a mediana do canal.'}
+          </p>
+          <div className="mt-5 flex flex-wrap gap-2">
+            <span className="inline-flex items-center gap-2 rounded-lg border border-panel/15 bg-panel/8 px-3 py-2 text-xs text-panel/80">
+              <Target size={14} className="text-accent" aria-hidden />
+              {insightCount ? `${insightCount} ${insightCount === 1 ? 'ponto pede' : 'pontos pedem'} atenção` : 'Nenhum alerta crítico agora'}
+            </span>
+            {newest ? <span className="inline-flex items-center rounded-lg border border-panel/15 bg-panel/8 px-3 py-2 text-xs text-panel/80">Último vídeo: {formatAge(newest.published)}</span> : null}
+          </div>
+        </div>
+
+        <dl className="grid gap-px overflow-hidden rounded-xl border border-panel/15 bg-panel/15 sm:grid-cols-2 xl:grid-cols-4">
+          {metrics.map((metric) => (
+            <div key={metric.label} className="min-w-0 bg-ink/80 p-4">
+              <dt className="text-2xs font-medium tracking-wide text-panel/60 uppercase">{metric.label}</dt>
+              <dd className="mt-2 truncate text-xl font-medium tracking-[-0.025em] text-panel">{metric.value}</dd>
+              <div className="mt-2 flex items-center justify-between gap-2">
+                <span className="truncate text-2xs text-panel/55">{metric.detail}</span>
+                {metric.points.length > 1 ? <Sparkline points={metric.points} width={54} height={20} /> : <CircleDot size={15} className="shrink-0 text-panel/35" aria-hidden />}
+              </div>
+            </div>
+          ))}
+        </dl>
+        {recentLikeRate != null && recentLikeRate > 0 ? <p className="relative -mt-3 text-2xs text-panel/55">Engajamento médio recente: {formatPercent(recentLikeRate)} de likes por view.</p> : null}
+      </div>
+    </section>
+  );
+}
+
+function ProductionFlow() {
+  const { db } = useData();
+  const stages = ['ideia', 'roteiro', 'gravacao', 'edicao', 'agendado'] as const;
+  const total = db.pautas.filter((pauta) => pauta.stage !== 'publicado').length;
+  return (
+    <Panel title="Linha de produção" description={total ? `${total} pautas em aberto` : 'Sem pautas em andamento'} actions={<ButtonLink to="/pautas" variant="ghost" size="sm">Abrir quadro</ButtonLink>}>
+      <ol className="grid grid-cols-5 gap-1.5" aria-label="Etapas de produção">
+        {stages.map((stage) => {
+          const count = db.pautas.filter((pauta) => pauta.stage === stage).length;
+          return (
+            <li key={stage} className="min-w-0 rounded-lg bg-sunken px-2 py-2.5 text-center">
+              <span className="block text-lg font-medium tabular-nums text-ink">{count}</span>
+              <span className="mt-0.5 block truncate text-2xs text-ink-3">{STAGE_LABEL[stage]}</span>
+            </li>
+          );
+        })}
+      </ol>
+      <p className="mt-3 flex items-center gap-1.5 text-xs text-ink-2"><Layers3 size={14} aria-hidden /> Acompanhe cada pauta até a publicação sem perder o ritmo.</p>
+    </Panel>
+  );
+}
+
+function TopicSignals() {
+  const { analysis } = useData();
+  const topics = (analysis?.topics ?? []).slice(0, 4);
+  return (
+    <Panel title="Sinais de tema" description="Assuntos que se repetem acima da média no radar" actions={<ButtonLink to="/radar" variant="ghost" size="sm">Ver radar</ButtonLink>}>
+      {topics.length ? (
+        <div className="space-y-2">
+          {topics.map((topic) => (
+            <Link key={topic.term} to="/o-que-gravar" className="group flex items-center justify-between gap-3 rounded-lg bg-sunken px-3 py-2.5 transition-colors hover:bg-hover">
+              <span className="min-w-0">
+                <span className="block truncate text-sm font-medium text-ink group-hover:underline">{topic.label}</span>
+                <span className="text-xs text-ink-3">{topic.hits} vídeos acima da média</span>
+              </span>
+              <span className="shrink-0 text-xs font-medium tabular-nums text-accent-ink">{formatScore(topic.avgScore)}</span>
+            </Link>
+          ))}
+        </div>
+      ) : <EmptyState icon={Target} title="Aguardando sinais do radar" className="py-4">Os temas aparecem depois de mais dados de desempenho.</EmptyState>}
+    </Panel>
+  );
+}
 
 function periodStats(profile: AnalyzedChannel, days: number) {
   const today = dateKey(Date.now());
@@ -71,7 +174,7 @@ function AnalyticsPanel({ profile }: { profile: AnalyzedChannel }) {
       padded={false}
       title="Análise do canal"
       description={`Últimos ${period} dias`}
-      actions={<SegmentedControl label="Período" value={period} onChange={setPeriod} options={[{ value: '7', label: '7 dias' }, { value: '28', label: '28 dias' }, { value: '90', label: '90 dias' }]} />}
+      actions={<SegmentedControl label="Período" value={period} onChange={setPeriod} options={[{ value: '1', label: 'Hoje' }, { value: '7', label: '7 dias' }, { value: '28', label: '28 dias' }, { value: '90', label: '90 dias' }]} />}
     >
       <div role="tablist" aria-label="Métrica" className="grid grid-cols-3 border-y border-line">
         {tabs.map((item) => (
@@ -191,7 +294,7 @@ function UpcomingPautas() {
 function TopVideos({ profile }: { profile: AnalyzedChannel }) {
   const ranked = [...profile.videos].sort((a, b) => b.views - a.views).slice(0, 5);
   return (
-    <Panel className="xl:col-span-2" title="Vídeos mais vistos" description="Entre os últimos 15 do canal" actions={<ButtonLink to="/videos" variant="ghost" size="sm">Ver todos</ButtonLink>} padded={false}>
+    <Panel className="xl:col-span-2" title="Vídeos mais vistos" description="Entre os vídeos coletados do canal" actions={<ButtonLink to="/videos" variant="ghost" size="sm">Ver todos</ButtonLink>} padded={false}>
       <table className="w-full text-sm">
         <thead>
           <tr className="border-y border-line text-left text-2xs text-ink-3">
@@ -282,6 +385,7 @@ function WhatToRecord() {
 function OverviewSkeleton() {
   return (
     <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+      <Skeleton className="h-72 xl:col-span-3" />
       <Skeleton className="h-96 xl:col-span-2" />
       <Skeleton className="h-96" />
       <Skeleton className="h-64 xl:col-span-2" />
@@ -316,16 +420,23 @@ export function Overview() {
           </EmptyState>
         </Panel>
       ) : (
-        <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
-          <AnalyticsPanel profile={profile} />
-          <LatestVideo profile={profile} />
-          <Panel className="xl:col-span-2" title="Leituras automáticas" description="O que mudou e o que fazer com isso">
-            {insights.length ? <InsightList insights={insights} /> : <EmptyState icon={TrendingUp} title="Nada fora do normal">As leituras aparecem quando um vídeo foge da mediana, uma pauta atrasa ou um tema cresce no radar.</EmptyState>}
-          </Panel>
-          <UpcomingPautas />
-          <WhatToRecord />
-          <TopVideos profile={profile} />
-          <RadarHighlights />
+        <div className="space-y-4">
+          <ChannelPulse profile={profile} insightCount={insights.length} radarCount={analysis?.radar.length ?? 0} />
+          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+            <Panel className="xl:col-span-2" title="Prioridades agora" description="O que mudou e a melhor próxima ação">
+              {insights.length ? <InsightList insights={insights} limit={4} /> : <EmptyState icon={TrendingUp} title="Nada fora do normal">As leituras aparecem quando um vídeo foge da mediana, uma pauta atrasa ou um tema cresce no radar.</EmptyState>}
+            </Panel>
+            <ProductionFlow />
+            <WhatToRecord />
+            <AnalyticsPanel profile={profile} />
+            <LatestVideo profile={profile} />
+            <TopVideos profile={profile} />
+            <div className="space-y-4">
+              <TopicSignals />
+              <RadarHighlights />
+            </div>
+            <UpcomingPautas />
+          </div>
         </div>
       )}
     </>
