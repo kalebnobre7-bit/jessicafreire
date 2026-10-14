@@ -20,12 +20,19 @@ async function readRuns(): Promise<AiRun[]> {
 export function useAiIdeas() {
   const [runs, setRuns] = useState<AiRun[] | null>(null);
   const [generating, setGenerating] = useState(generatingSince !== null);
+  const [unavailable, setUnavailable] = useState(false);
 
   const reload = useCallback(async () => {
     try {
-      setRuns(await readRuns());
+      const result = await Promise.race([
+        readRuns().then((items) => ({ items, timedOut: false })),
+        wait(8_000).then(() => ({ items: [], timedOut: true })),
+      ]);
+      setRuns(result.items);
+      setUnavailable(result.timedOut);
     } catch {
-      setRuns((current) => current ?? []);
+      setRuns([]);
+      setUnavailable(true);
     }
   }, []);
 
@@ -44,6 +51,7 @@ export function useAiIdeas() {
         const latest = await readRuns();
         if (latest[0]?.id !== before) {
           setRuns(latest);
+          setUnavailable(false);
           return 'done';
         }
       }
@@ -56,5 +64,5 @@ export function useAiIdeas() {
     }
   }, []);
 
-  return { runs, generating, generate, reload };
+  return { runs, generating, unavailable, generate, reload };
 }

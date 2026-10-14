@@ -59,7 +59,7 @@ function ChannelPulse({ profile, insightCount, radarCount }: { profile: Analyzed
           </div>
         </div>
 
-        <dl className="grid gap-px overflow-hidden rounded-xl border border-panel/15 bg-panel/15 sm:grid-cols-2 xl:grid-cols-4">
+        <dl className="grid gap-px overflow-hidden rounded-xl border border-panel/15 bg-panel/15 sm:grid-cols-2">
           {metrics.map((metric) => (
             <div key={metric.label} className="min-w-0 bg-ink/80 p-4">
               <dt className="text-2xs font-medium tracking-wide text-panel/60 uppercase">{metric.label}</dt>

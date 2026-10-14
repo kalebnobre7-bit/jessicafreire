@@ -97,7 +97,7 @@ function AiSection() {
   const { toast } = useUi();
   const navigate = useNavigate();
   const { ensureVideoReference } = useCreate();
-  const { runs, generating, generate } = useAiIdeas();
+  const { runs, generating, unavailable, generate } = useAiIdeas();
   const [focus, setFocus] = useState('');
 
   const latest = runs?.[0];
@@ -160,7 +160,8 @@ function AiSection() {
             </p>
           )
         ) : null}
-        {runs && !runs.length && !generating ? <p className="text-[13px] text-ink-2">Nenhuma ideia gerada ainda. Na primeira vez, o sistema pede a chave da Anthropic.</p> : null}
+        {unavailable && !generating ? <p className="text-[13px] text-ink-2">As rodadas anteriores não responderam agora. Você pode gerar uma nova rodada ou tentar recarregar a página.</p> : null}
+        {runs && !runs.length && !generating && !unavailable ? <p className="text-[13px] text-ink-2">Nenhuma ideia gerada ainda. Na primeira vez, o sistema pede a chave da Anthropic.</p> : null}
         {generating ? (
           <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-3">
             <Skeleton className="h-72" />

@@ -6,7 +6,7 @@ import { Badge, EmptyState, PageHeader, Panel, ScoreBadge } from '@/components/u
 import { Field, Input, Select } from '@/components/ui/form';
 import { Avatar, Thumb } from '@/components/ui/media';
 import { ConfirmDialog, Menu } from '@/components/ui/overlay';
-import type { AnalyzedChannel } from '@/lib/analytics';
+import { isRelevantRadarVideo, type AnalyzedChannel } from '@/lib/analytics';
 import { createId, normalizeHandle } from '@/lib/database';
 import { formatAge, formatCompact, formatScore } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
@@ -28,7 +28,10 @@ function Trending() {
   const [sort, setSort] = useState<'score' | 'views' | 'recent'>('score');
   const saved = new Set(db.references.map((reference) => reference.videoId));
   const videos = useMemo(() => {
-    const list = (analysis?.radar ?? []).flatMap((item) => item.videos).filter((video) => channel === 'todos' || video.channelHandle === channel);
+    const list = (analysis?.radar ?? [])
+      .flatMap((item) => item.videos)
+      .filter(isRelevantRadarVideo)
+      .filter((video) => channel === 'todos' || video.channelHandle === channel);
     const sorters = { score: (a: typeof list[number], b: typeof list[number]) => (b.score ?? -1) - (a.score ?? -1), views: (a: typeof list[number], b: typeof list[number]) => b.views - a.views, recent: (a: typeof list[number], b: typeof list[number]) => Date.parse(b.published) - Date.parse(a.published) };
     return [...list].sort(sorters[sort]);
   }, [analysis, channel, sort]);
