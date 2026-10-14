@@ -422,7 +422,7 @@ export function Overview() {
       ) : (
         <div className="space-y-4">
           <ChannelPulse profile={profile} insightCount={insights.length} radarCount={analysis?.radar.length ?? 0} />
-          <div className="grid grid-cols-1 gap-4 xl:grid-cols-3">
+          <div className="grid grid-cols-1 items-start gap-4 xl:grid-cols-3">
             <Panel className="xl:col-span-2" title="Prioridades agora" description="O que mudou e a melhor próxima ação">
               {insights.length ? <InsightList insights={insights} limit={4} /> : <EmptyState icon={TrendingUp} title="Nada fora do normal">As leituras aparecem quando um vídeo foge da mediana, uma pauta atrasa ou um tema cresce no radar.</EmptyState>}
             </Panel>
