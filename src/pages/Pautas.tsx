@@ -1,5 +1,5 @@
 import { DndContext, DragOverlay, KeyboardSensor, PointerSensor, useDraggable, useDroppable, useSensor, useSensors, type DragEndEvent } from '@dnd-kit/core';
-import { CalendarDays, Eye, Lightbulb, ListChecks, Plus, Search } from 'lucide-react';
+import { CalendarDays, Eye, Lightbulb, ListChecks, MoveHorizontal, Plus, Search } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router';
 import { Button } from '@/components/ui/button';
@@ -175,10 +175,15 @@ function Board({ pautas }: { pautas: Pauta[] }) {
         },
       }}
     >
-      <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
-        {STAGES.map((stage) => (
-          <Column key={stage.id} stage={stage.id} hint={stage.hint} pautas={pautas.filter((pauta) => pauta.stage === stage.id).sort(sortPautas)} />
-        ))}
+      <div className="relative">
+        <p className="mb-2 flex items-center gap-1.5 text-xs text-ink-3">
+          <MoveHorizontal size={14} aria-hidden /> Deslize lateralmente para ver todas as etapas.
+        </p>
+        <div className="-mx-4 flex gap-3 overflow-x-auto px-4 pb-4 sm:-mx-6 sm:px-6 lg:-mx-8 lg:px-8">
+          {STAGES.map((stage) => (
+            <Column key={stage.id} stage={stage.id} hint={stage.hint} pautas={pautas.filter((pauta) => pauta.stage === stage.id).sort(sortPautas)} />
+          ))}
+        </div>
       </div>
       <DragOverlay dropAnimation={null}>
         {active ? (
