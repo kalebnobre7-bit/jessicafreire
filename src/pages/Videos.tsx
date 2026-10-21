@@ -6,7 +6,7 @@ import { Badge, EmptyState, PageHeader, Panel, ScoreBar, Skeleton } from '@/comp
 import { Input } from '@/components/ui/form';
 import { Thumb } from '@/components/ui/media';
 import { matchesQuery, type AnalyzedVideo } from '@/lib/analytics';
-import { formatAge, formatCompact, formatDate, formatNumber, formatPercent } from '@/lib/format';
+import { formatAge, formatCompact, formatDate, formatNumber, formatPercent, formatScore } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
 import { useData } from '@/store/data';
 
@@ -96,6 +96,7 @@ export function Videos() {
                             </Link>
                             <div className="mt-1 flex flex-wrap items-center gap-1.5 text-xs text-ink-3">
                               <span className="md:hidden">{formatAge(video.published)}</span>
+                              {video.short ? <Badge>Short</Badge> : video.duration ? <span>{Math.round(video.duration / 60)} min</span> : null}
                               {pauta ? <Badge tone="info">Pauta ligada</Badge> : null}
                             </div>
                           </div>
@@ -110,7 +111,11 @@ export function Videos() {
                       <td className="hidden py-3 pr-5 text-right tabular-nums text-ink-2 lg:table-cell">{formatCompact(video.likes)}</td>
                       <td className="hidden py-3 pr-5 text-right tabular-nums text-ink-2 xl:table-cell">{video.likeRate == null ? '—' : formatPercent(video.likeRate)}</td>
                       <td className="hidden py-3 pr-5 sm:table-cell">
-                        <ScoreBar score={video.score} />
+                        {video.score == null && video.earlyScore != null ? (
+                          <span className="text-xs text-ink-2 tabular-nums" title="Views contra o que os outros vídeos do canal tinham com a mesma idade">{formatScore(video.earlyScore)} na largada</span>
+                        ) : (
+                          <ScoreBar score={video.score} />
+                        )}
                       </td>
                     </tr>
                   );
@@ -120,7 +125,7 @@ export function Videos() {
             {!videos.length ? <EmptyState icon={Search} title={`Nenhum vídeo com "${query}"`} /> : null}
           </div>
           <p className="border-t border-line px-5 py-3 text-2xs text-ink-3">
-            "vs. mediana" compara as views com a mediana dos 15 vídeos mais recentes ({formatCompact(profile.baseline)}). A marca vertical é a mediana; vídeos com menos de 3 dias ficam de fora. "24h" e a curva de views passam a aparecer depois da coleta do vídeo.
+            "vs. mediana" compara as views com a mediana dos 15 vídeos longos mais recentes ({formatCompact(profile.baseline)}); Shorts são comparados com Shorts. A marca vertical é a mediana; vídeos com menos de 3 dias mostram a largada, contra o que os outros tinham com a mesma idade. "24h" e a curva de views passam a aparecer depois da coleta do vídeo.
           </p>
         </Panel>
       )}
