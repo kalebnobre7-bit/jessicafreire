@@ -1,5 +1,5 @@
 // Leituras a partir do metrics.json: desempenho por canal, séries históricas, vídeos em alta, temas e sugestões.
-import { formatAge, formatCompact, formatDate, formatScore, dateKey } from './format';
+import { formatAge, formatCompact, formatDate, formatPercent, formatScore, dateKey, shiftDate } from './format';
 import type { ChannelMetrics, Database, Metrics, ReportSnapshot, Video } from './types';
 
 const DAY = 86_400_000;
@@ -10,9 +10,14 @@ const STOPWORDS = new Set(
 const SHORT_TERMS = new Set(['ia', 'ai']);
 const RADAR_RELEVANCE_TERMS = new Set([
   'ia', 'ai', 'tiktok', 'shop', 'shopee', 'chatgpt', 'gpt', 'claude', 'gemini', 'video', 'videos',
-  'conteudo', 'youtube', 'ugc', 'pov', 'prompt', 'afiliado', 'afiliados', 'influenciadora', 'influencer',
-  'automacao', 'automaticas', 'ferramenta', 'ferramentas', 'canal', 'viral', 'venda', 'vender', 'produto',
+  'conteudo', 'youtube', 'ugc', 'pov', 'prompt', 'prompts', 'afiliado', 'afiliados', 'afiliada', 'influenciadora', 'influencer',
+  'automacao', 'automatico', 'automatica', 'automaticas', 'ferramenta', 'ferramentas', 'canal', 'viral', 'venda', 'vendas', 'vender', 'produto', 'produtos',
+  'gratis', 'gratuito', 'gratuita', 'gratuitos', 'gratuitas', 'ilimitado', 'ilimitados', 'ilimitada', 'motion', 'flow', 'veo', 'kling', 'sora', 'higgsfield',
+  'agente', 'agentes', 'live', 'lives', 'nicho', 'nichos', 'carrossel', 'roteiro', 'avatar', 'faceless', 'monetizar', 'dropshipping', 'unboxing',
 ]);
+// Palavras comuns em títulos de qualquer nicho: não bastam para dizer que um vídeo fala do assunto da Jéssica
+const GENERIC_WORDS = new Set('novo nova novos novas melhor melhores chance contra ganhou fazer criar cria crie testei descobri liberaram liberou achei secreta secreto unica unicas pode copiar mim vez coisa forma jeito passo'.split(' '));
+const EARLY_SAMPLES = 3;
 
 export interface Point {
   date: string;
@@ -23,11 +28,21 @@ export interface AnalyzedVideo extends Video {
   channelHandle: string;
   channelTitle: string;
   ageDays: number;
+  // Views contra a mediana do canal no mesmo formato (vídeo longo ou Short), a partir de 3 dias
   score: number | null;
+  // Antes de 3 dias: views contra o que os outros vídeos do canal tinham com a mesma idade
+  earlyScore: number | null;
   gained24h: number | null;
+  // Views ganhas nas últimas 24h em relação à mediana do canal: mostra o que está acelerando agora
+  heat: number | null;
+  viewsPerDay: number;
   likeRate: number | null;
+  // Fala do assunto da Jéssica (lista de termos do nicho ou vocabulário dos títulos dela)
+  relevant: boolean;
   series: Point[];
 }
+
+export type ChannelPhase = 'alta' | 'estavel' | 'queda';
 
 export interface AnalyzedChannel extends Omit<ChannelMetrics, 'videos'> {
   videos: AnalyzedVideo[];
@@ -37,6 +52,10 @@ export interface AnalyzedChannel extends Omit<ChannelMetrics, 'videos'> {
   top: AnalyzedVideo | null;
   subscribersSeries: Point[];
   totalViewsSeries: Point[];
+  subscribersGained30d: number | null;
+  // Últimos 5 vídeos maduros contra a mediana dos 15: o canal está esquentando ou esfriando
+  phase: ChannelPhase | null;
+  phaseRatio: number | null;
 }
 
 export interface Topic {
@@ -73,13 +92,50 @@ export interface Analysis {
   videoById: Map<string, AnalyzedVideo>;
   trending: AnalyzedVideo[];
   topics: Topic[];
+  patterns: TitlePattern[];
+  durations: DurationBucket[];
+}
+
+export interface TitlePattern {
+  id: string;
+  label: string;
+  example: string;
+  // Mediana do "x a mediana" dos vídeos do radar com e sem o padrão
+  withScore: number;
+  withoutScore: number;
+  lift: number;
+  count: number;
+  total: number;
+  videoIds: string[];
+  // Parcela dos títulos recentes da Jéssica que usa o padrão, e o mesmo efeito medido no canal dela
+  ownShare: number | null;
+  ownLift: number | null;
+}
+
+export interface DurationBucket {
+  id: string;
+  label: string;
+  radarScore: number | null;
+  radarCount: number;
+  ownScore: number | null;
+  ownCount: number;
 }
 
 export function toWords(text: string): string[] {
   return text.toLocaleLowerCase('pt-BR').normalize('NFD').replace(/\p{M}/gu, '').split(/[^\p{L}\p{N}]+/u).filter(Boolean);
 }
-export function isRelevantRadarVideo(video: Pick<AnalyzedVideo, 'title'>): boolean {
-  return toWords(video.title).some((word) => RADAR_RELEVANCE_TERMS.has(word));
+export function isRelevantRadarVideo(video: Pick<AnalyzedVideo, 'relevant'>): boolean {
+  return video.relevant;
+}
+// Palavras que aparecem em pelo menos dois títulos da Jéssica: o vocabulário do nicho dela
+function ownVocabulary(videos: Video[]): Set<string> {
+  const counts = new Map<string, number>();
+  for (const video of videos) for (const word of new Set(contentWords(video.title))) counts.set(word, (counts.get(word) ?? 0) + 1);
+  return new Set([...counts].filter(([word, count]) => count >= 2 && !GENERIC_WORDS.has(word)).map(([word]) => word));
+}
+function isRelevantTitle(title: string, vocabulary: Set<string>): boolean {
+  const words = toWords(title);
+  return words.some((word) => RADAR_RELEVANCE_TERMS.has(word)) || new Set(words.filter((word) => vocabulary.has(word))).size >= 2;
 }
 // Busca por início de palavra, sem acento: "ia" não casa com "ideia", "video" casa com "Vídeos"
 export function matchesQuery(text: string, query: string): boolean {
@@ -130,37 +186,72 @@ export function dailyGains(series: Point[]): Point[] {
   return series.slice(1).map((point, index) => ({ date: point.date, value: Math.max(0, point.value - (series[index]?.value ?? point.value)) }));
 }
 
-function analyzeChannel(channel: ChannelMetrics, history: Metrics['history'][string] | undefined, now: number): AnalyzedChannel {
+function analyzeChannel(channel: ChannelMetrics, history: Metrics['history'][string] | undefined, vocabulary: Set<string>, now: number): AnalyzedChannel {
+  const today = dateKey(now);
   const yesterday = dateKey(now - DAY);
-  const base = channel.videos.map((video) => ({ ...video, ageDays: (now - Date.parse(video.published)) / DAY }));
-  const recent = base.slice(0, 15);
-  const mature = recent.filter((video) => video.ageDays >= MATURE_DAYS);
-  // A referência fica nos últimos 15 para não distorcer a leitura atual com o catálogo antigo.
-  const baseline = median((mature.length >= 3 ? mature : recent).map((video) => video.views));
+  const base = channel.videos.map((video) => ({ ...video, ageDays: (now - Date.parse(video.published)) / DAY, series: toSeries(history?.views[video.id]) }));
+  // A referência fica nos últimos 15 vídeos longos para não distorcer a leitura atual com o catálogo antigo nem com Shorts
+  const baselineOf = (videos: typeof base) => {
+    const recent = videos.slice(0, 15);
+    const mature = recent.filter((video) => video.ageDays >= MATURE_DAYS);
+    return { recent, mature, value: median((mature.length >= 3 ? mature : recent).map((video) => video.views)) };
+  };
+  const long = baselineOf(base.filter((video) => !video.short));
+  const shorts = baselineOf(base.filter((video) => video.short));
+  const baseline = long.value;
+  // Quantas views os vídeos do canal tinham com N dias de vida, lido no histórico diário
+  const viewsAtAge = (days: number, except: string, short: boolean) =>
+    base
+      .filter((video) => video.id !== except && Boolean(video.short) === short && video.ageDays >= MATURE_DAYS)
+      .map((video) => valueAt(video.series, shiftDate(dateKey(Date.parse(video.published)), days)))
+      .filter((value): value is number => value != null && value > 0);
+
   const videos: AnalyzedVideo[] = base.map((video) => {
-    const series = toSeries(history?.views[video.id]);
-    const previous = valueAt(series, yesterday);
+    const reference = video.short ? (shorts.mature.length >= 3 ? shorts.value : 0) : baseline;
+    // Ganho no último dia coletado, desde que a coleta seja de hoje ou de ontem (de madrugada a de hoje ainda não rodou)
+    const last = video.series.at(-1);
+    const previous = last && last.date >= yesterday ? valueAt(video.series, shiftDate(last.date, -1)) : null;
+    const gained24h = previous == null ? null : Math.max(0, video.views - previous);
+    let earlyScore: number | null = null;
+    // Com menos de 12h o vídeo seria comparado ao dia inteiro dos outros
+    if (video.ageDays < MATURE_DAYS && video.ageDays >= 0.5) {
+      const days = Math.max(0, Math.round((Date.parse(`${today}T12:00:00`) - Date.parse(`${dateKey(Date.parse(video.published))}T12:00:00`)) / DAY));
+      const samples = viewsAtAge(days, video.id, Boolean(video.short));
+      if (samples.length >= EARLY_SAMPLES) earlyScore = video.views / median(samples);
+    }
     return {
       ...video,
       channelHandle: channel.handle,
       channelTitle: channel.title,
-      score: video.ageDays >= MATURE_DAYS && baseline ? video.views / baseline : null,
-      gained24h: previous == null || series.at(-1)?.date === yesterday ? null : video.views - previous,
+      score: video.ageDays >= MATURE_DAYS && reference ? video.views / reference : null,
+      earlyScore,
+      gained24h,
+      heat: gained24h != null && reference ? gained24h / reference : null,
+      viewsPerDay: video.views / Math.max(video.ageDays, 0.25),
       likeRate: video.views ? video.likes / video.views : null,
-      series,
+      relevant: isRelevantTitle(video.title, vocabulary),
     };
   });
+  const recent = long.recent;
   const gaps = recent.slice(0, -1).map((video, index) => (Date.parse(video.published) - Date.parse(recent[index + 1]?.published ?? video.published)) / DAY);
   const first = base[0];
+  const subscribersSeries = toSeries(history?.subscribers);
+  const pastSubscribers = valueFrom(subscribersSeries, shiftDate(today, -30), today);
+  const currentSubscribers = valueAt(subscribersSeries, today);
+  const lastFive = long.mature.slice(0, 5);
+  const phaseRatio = lastFive.length >= 3 && long.mature.length >= 8 && baseline ? median(lastFive.map((video) => video.views)) / baseline : null;
   return {
     ...channel,
     videos,
     baseline,
     uploadEveryDays: gaps.length ? median(gaps) : null,
     daysSinceUpload: first ? (now - Date.parse(first.published)) / DAY : null,
-    top: videos.filter((video) => video.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0] ?? null,
-    subscribersSeries: toSeries(history?.subscribers),
+    top: videos.filter((video) => video.score != null && !video.short).sort((a, b) => (b.score ?? 0) - (a.score ?? 0))[0] ?? null,
+    subscribersSeries,
     totalViewsSeries: toSeries(history?.totalViews),
+    subscribersGained30d: pastSubscribers == null || currentSubscribers == null || subscribersSeries.length < 2 ? null : currentSubscribers - pastSubscribers,
+    phase: phaseRatio == null ? null : phaseRatio >= 1.25 ? 'alta' : phaseRatio <= 0.8 ? 'queda' : 'estavel',
+    phaseRatio,
   };
 }
 
@@ -201,6 +292,79 @@ export function findTopics(videos: AnalyzedVideo[], db: Database, { minTotal = 3
   return chosen;
 }
 
+const TITLE_PATTERNS: { id: string; label: string; example: string; test: (title: string, words: string[]) => boolean }[] = [
+  { id: 'numero', label: 'Número no título', example: '5 IAs, 7 dias, 10 vídeos', test: (title) => /\d/.test(title.replace(/\b(19|20)\d{2}\b/g, '')) },
+  { id: 'dinheiro', label: 'Valor em dinheiro', example: 'R$4.400, 100 mil', test: (title) => /R\$|US\$|£|€|\d\s*mil\b/i.test(title) },
+  { id: 'gratis', label: 'Promessa de grátis', example: 'de graça, 100% gratuito', test: (title, words) => words.some((word) => /^(gratis|gratuit|free)/.test(word)) || /de gra[cç]a|sem pagar/i.test(title) },
+  { id: 'experiencia', label: 'Experiência própria', example: 'testei, fiz, criei, copiei', test: (_, words) => words.some((word) => ['testei', 'fiz', 'criei', 'copiei', 'montei', 'usei', 'deixei', 'coloquei', 'faturei', 'ganhei', 'vendi'].includes(word)) },
+  { id: 'novidade', label: 'Novidade', example: 'nova IA, lançou, liberaram', test: (_, words) => words.some((word) => ['nova', 'novo', 'lancou', 'lancaram', 'liberou', 'liberaram', 'chegou', 'finalmente', 'acaba'].includes(word)) },
+  { id: 'segredo', label: 'Segredo ou descoberta', example: 'secreta, escondida, ninguém conhece', test: (_, words) => words.some((word) => /^(secret|escondid|descobri|ninguem|revelad|truque)/.test(word)) },
+  { id: 'prazo', label: 'Prazo ou desafio', example: 'em 7 dias, em 24 horas', test: (title) => /\d+\s*(dias|horas|h\b|minutos|min\b|semanas)/i.test(title) },
+  { id: 'parenteses', label: 'Complemento entre parênteses', example: '(PODE ME COPIAR)', test: (title) => /\([^)]{3,}\)/.test(title) },
+  { id: 'pergunta', label: 'Pergunta', example: 'vale a pena?', test: (title) => title.includes('?') },
+  { id: 'caixa-alta', label: 'Título todo em caixa alta', example: 'NUNCA MAIS PAGUE…', test: (title) => {
+    const letters = title.replace(/[^\p{L}]/gu, '');
+    return letters.length >= 10 && letters.replace(/[^\p{Lu}]/gu, '').length / letters.length >= 0.7;
+  } },
+  { id: 'emoji', label: 'Emoji', example: '🔥 🤯', test: (title) => /\p{Extended_Pictographic}/u.test(title) },
+];
+
+// Quais estruturas de título andam junto com desempenho acima da mediana no radar, e quanto a Jéssica já usa cada uma
+export function findTitlePatterns(radar: AnalyzedVideo[], own: AnalyzedVideo[]): TitlePattern[] {
+  const scored = radar.filter((video) => video.score != null && !video.short);
+  const ownScored = own.filter((video) => video.score != null && !video.short);
+  const ownRecent = own.filter((video) => !video.short).slice(0, 15);
+  const measure = (videos: AnalyzedVideo[], test: (title: string, words: string[]) => boolean) => {
+    const withPattern = videos.filter((video) => test(video.title, toWords(video.title)));
+    const without = videos.filter((video) => !withPattern.includes(video));
+    return { withPattern, without, withScore: median(withPattern.map((video) => video.score ?? 0)), withoutScore: median(without.map((video) => video.score ?? 0)) };
+  };
+  return TITLE_PATTERNS.flatMap((pattern) => {
+    const radarStats = measure(scored, pattern.test);
+    if (radarStats.withPattern.length < 5 || radarStats.without.length < 5 || !radarStats.withoutScore) return [];
+    const ownStats = measure(ownScored, pattern.test);
+    return [{
+      id: pattern.id,
+      label: pattern.label,
+      example: pattern.example,
+      withScore: radarStats.withScore,
+      withoutScore: radarStats.withoutScore,
+      lift: radarStats.withScore / radarStats.withoutScore,
+      count: radarStats.withPattern.length,
+      total: scored.length,
+      videoIds: [...radarStats.withPattern].sort((a, b) => (b.score ?? 0) - (a.score ?? 0)).slice(0, 4).map((video) => video.id),
+      ownShare: ownRecent.length ? ownRecent.filter((video) => pattern.test(video.title, toWords(video.title))).length / ownRecent.length : null,
+      ownLift: ownStats.withPattern.length >= 3 && ownStats.without.length >= 3 && ownStats.withoutScore ? ownStats.withScore / ownStats.withoutScore : null,
+    }];
+  }).sort((a, b) => b.lift - a.lift);
+}
+
+const DURATION_BUCKETS = [
+  { id: 'curto', label: 'Até 8 min', max: 8 * 60 },
+  { id: 'medio', label: '8 a 15 min', max: 15 * 60 },
+  { id: 'longo', label: 'Mais de 15 min', max: Infinity },
+];
+
+export function findDurationBuckets(radar: AnalyzedVideo[], own: AnalyzedVideo[]): DurationBucket[] {
+  const bucketOf = (video: AnalyzedVideo) => DURATION_BUCKETS.find((bucket) => (video.duration ?? 0) <= bucket.max)?.id;
+  const timed = (videos: AnalyzedVideo[]) => videos.filter((video) => video.score != null && !video.short && video.duration);
+  const radarTimed = timed(radar);
+  if (radarTimed.length < 6) return [];
+  const ownTimed = timed(own);
+  return DURATION_BUCKETS.map((bucket) => {
+    const radarIn = radarTimed.filter((video) => bucketOf(video) === bucket.id);
+    const ownIn = ownTimed.filter((video) => bucketOf(video) === bucket.id);
+    return {
+      id: bucket.id,
+      label: bucket.label,
+      radarScore: radarIn.length >= 2 ? median(radarIn.map((video) => video.score ?? 0)) : null,
+      radarCount: radarIn.length,
+      ownScore: ownIn.length >= 2 ? median(ownIn.map((video) => video.score ?? 0)) : null,
+      ownCount: ownIn.length,
+    };
+  });
+}
+
 // Uma pauta "já publicada" é a que divide pelo menos 60% das palavras (e no mínimo 3) com um vídeo do canal
 export function findPublishedMatch(pauta: { title: string; ignoredVideoIds: string[] }, videos: AnalyzedVideo[]): AnalyzedVideo | null {
   const pautaWords = [...new Set(contentWords(pauta.title))];
@@ -219,8 +383,9 @@ export function findPublishedMatch(pauta: { title: string; ignoredVideoIds: stri
 export function analyzeMetrics(metrics: Metrics, db: Database, now = Date.now()): Analysis {
   // Nome do canal: o cadastrado no painel tem prioridade sobre o título do YouTube
   const names = new Map(db.channels.map((channel) => [channel.handle.toLowerCase(), channel.name]));
+  const vocabulary = ownVocabulary(metrics.channels[db.profile.handle.toLowerCase()]?.videos ?? []);
   const channels = new Map(
-    Object.entries(metrics.channels).map(([handle, channel]) => [handle, analyzeChannel({ ...channel, title: names.get(handle) ?? channel.title }, metrics.history[handle], now)]),
+    Object.entries(metrics.channels).map(([handle, channel]) => [handle, analyzeChannel({ ...channel, title: names.get(handle) ?? channel.title }, metrics.history[handle], vocabulary, now)]),
   );
   const profile = channels.get(db.profile.handle.toLowerCase()) ?? null;
   const radar = db.channels.map((channel) => channels.get(channel.handle.toLowerCase())).filter((channel): channel is AnalyzedChannel => Boolean(channel));
@@ -232,8 +397,10 @@ export function analyzeMetrics(metrics: Metrics, db: Database, now = Date.now())
     profile,
     radar,
     videoById: new Map([...channels.values()].flatMap((channel) => channel.videos.map((video) => [video.id, video] as const))),
-    trending: radarVideos.filter((video) => video.score != null).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
-    topics: findTopics(relevantRadarVideos, db),
+    trending: radarVideos.filter((video) => video.score != null && !video.short).sort((a, b) => (b.score ?? 0) - (a.score ?? 0)),
+    topics: findTopics(relevantRadarVideos.filter((video) => !video.short), db),
+    patterns: findTitlePatterns(relevantRadarVideos, profile?.videos ?? []),
+    durations: findDurationBuckets(relevantRadarVideos, profile?.videos ?? []),
   };
 }
 
@@ -269,8 +436,17 @@ export function buildInsights(analysis: Analysis, db: Database, now = Date.now()
       });
     }
 
-    const newest = profile.videos[0];
-    if (newest && newest.score == null && newest.gained24h != null) {
+    const newest = profile.videos.find((video) => !video.short);
+    if (newest && newest.score == null && newest.earlyScore != null) {
+      const above = newest.earlyScore >= 1;
+      insights.push({
+        id: `newest-${newest.id}`,
+        tone: above ? 'up' : 'down',
+        title: above ? 'Vídeo novo largando acima do normal' : 'Vídeo novo largando abaixo do normal',
+        text: `"${newest.title}" saiu ${formatAge(newest.published, now)} e tem ${formatCompact(newest.views)} views, ${formatScore(newest.earlyScore)} o que os vídeos do canal costumam ter com a mesma idade.`,
+        actions: [{ type: 'open-video', label: 'Ver vídeo', videoId: newest.id }],
+      });
+    } else if (newest && newest.score == null && newest.gained24h != null) {
       insights.push({
         id: `newest-${newest.id}`,
         tone: 'info',
@@ -307,6 +483,31 @@ export function buildInsights(analysis: Analysis, db: Database, now = Date.now()
   if (stalled.length) {
     const oldest = stalled.sort((a, b) => a.updatedAt - b.updatedAt)[0];
     if (oldest) insights.push({ id: 'stalled', tone: 'neutral', title: `${stalled.length} ${stalled.length === 1 ? 'pauta parada' : 'pautas paradas'}`, text: `"${oldest.title}" não é mexida ${formatAge(oldest.updatedAt, now)}.`, actions: [{ type: 'open-pauta', label: 'Abrir pauta', pautaId: oldest.id }] });
+  }
+
+  const radarVideos = analysis.radar.flatMap((channel) => channel.videos).filter((video) => video.relevant && !video.short);
+  const breakout = radarVideos.filter((video) => (video.earlyScore ?? 0) >= 2).sort((a, b) => (b.earlyScore ?? 0) - (a.earlyScore ?? 0))[0];
+  if (breakout?.earlyScore != null) {
+    const saved = db.references.some((reference) => reference.videoId === breakout.id);
+    insights.push({
+      id: `early-${breakout.id}`,
+      tone: 'accent',
+      title: `${breakout.channelTitle} decolando agora`,
+      text: `"${breakout.title}" saiu ${formatAge(breakout.published, now)} e já tem ${formatCompact(breakout.views)} views, ${formatScore(breakout.earlyScore)} o normal do canal para a mesma idade.`,
+      actions: saved ? [] : [{ type: 'save-reference', label: 'Salvar referência', videoId: breakout.id }],
+    });
+  }
+  // Vídeo já maduro que voltou a ganhar muitas views: o algoritmo está empurrando de novo
+  const resurging = radarVideos.filter((video) => video.score != null && (video.heat ?? 0) >= 0.3).sort((a, b) => (b.heat ?? 0) - (a.heat ?? 0))[0];
+  if (resurging?.heat != null && resurging.gained24h != null) {
+    const saved = db.references.some((reference) => reference.videoId === resurging.id);
+    insights.push({
+      id: `heat-${resurging.id}`,
+      tone: 'accent',
+      title: `${resurging.channelTitle} ganhando views de novo`,
+      text: `"${resurging.title}" ganhou ${formatCompact(resurging.gained24h)} views nas últimas 24h, o equivalente a ${formatPercent(resurging.heat, 0)} das views de um vídeo típico do canal em um só dia.`,
+      actions: saved ? [] : [{ type: 'save-reference', label: 'Salvar referência', videoId: resurging.id }],
+    });
   }
 
   for (const video of analysis.trending.filter((item) => (item.score ?? 0) >= 2 && isRelevantRadarVideo(item)).slice(0, 2)) {

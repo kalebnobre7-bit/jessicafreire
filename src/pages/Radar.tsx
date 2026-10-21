@@ -1,14 +1,14 @@
-import { Bookmark, BookmarkCheck, ChartColumn, ExternalLink, Flame, Hash, Lightbulb, MoreHorizontal, Plus, RefreshCw, Trash2, UserPlus, Users } from 'lucide-react';
+import { Bookmark, BookmarkCheck, ChartColumn, ExternalLink, Flame, Hash, Lightbulb, Minus, MoreHorizontal, Plus, RefreshCw, Trash2, TrendingDown, TrendingUp, Type, UserPlus, Users } from 'lucide-react';
 import { useEffect, useMemo, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router';
 import { Button, IconButton } from '@/components/ui/button';
-import { Badge, EmptyState, PageHeader, Panel, ScoreBadge } from '@/components/ui/feedback';
-import { Field, Input, Select } from '@/components/ui/form';
+import { Badge, Delta, EmptyState, PageHeader, Panel, ScoreBadge } from '@/components/ui/feedback';
+import { Field, Input, SegmentedControl, Select } from '@/components/ui/form';
 import { Avatar, Thumb } from '@/components/ui/media';
 import { ConfirmDialog, Menu } from '@/components/ui/overlay';
-import { isRelevantRadarVideo, type AnalyzedChannel } from '@/lib/analytics';
+import { type AnalyzedChannel, type AnalyzedVideo, type ChannelPhase, type TitlePattern } from '@/lib/analytics';
 import { createId, normalizeHandle } from '@/lib/database';
-import { formatAge, formatCompact, formatScore } from '@/lib/format';
+import { formatAge, formatCompact, formatPercent, formatScore } from '@/lib/format';
 import { useCollect } from '@/hooks/useCollect';
 import { useCreate } from '@/hooks/useCreate';
 import { useData } from '@/store/data';
@@ -18,54 +18,88 @@ type Tab = 'alta' | 'canais' | 'temas';
 const TABS: { id: Tab; label: string }[] = [
   { id: 'alta', label: 'Em alta' },
   { id: 'canais', label: 'Canais' },
-  { id: 'temas', label: 'Temas' },
+  { id: 'temas', label: 'Temas e títulos' },
 ];
+
+type Period = '7' | '30' | 'tudo';
+type Format = 'todos' | 'videos' | 'shorts';
+type Sort = 'score' | 'agora' | 'ritmo' | 'views' | 'recent';
+
+// Selo da thumb: vezes a mediana, ou a largada contra vídeos do canal com a mesma idade
+function scoreLabel(video: AnalyzedVideo): string {
+  if (video.score != null) return formatScore(video.score);
+  if (video.earlyScore != null) return `${formatScore(video.earlyScore)} na largada`;
+  return 'NOVO';
+}
 
 function Trending() {
   const { db, analysis } = useData();
   const { saveReference } = useCreate();
   const [channel, setChannel] = useState('todos');
-  const [sort, setSort] = useState<'score' | 'views' | 'recent'>('score');
+  const [sort, setSort] = useState<Sort>('score');
+  const [period, setPeriod] = useState<Period>('30');
+  const [format, setFormat] = useState<Format>('videos');
+  const [showAll, setShowAll] = useState(false);
   const saved = new Set(db.references.map((reference) => reference.videoId));
+  const all = useMemo(() => (analysis?.radar ?? []).flatMap((item) => item.videos), [analysis]);
+  const hasShorts = all.some((video) => video.short);
+  const outside = all.filter((video) => !video.relevant).length;
   const videos = useMemo(() => {
-    const list = (analysis?.radar ?? [])
-      .flatMap((item) => item.videos)
-      .filter(isRelevantRadarVideo)
+    const list = all
+      .filter((video) => showAll || video.relevant)
+      .filter((video) => !hasShorts || format === 'todos' || (format === 'shorts') === Boolean(video.short))
+      .filter((video) => period === 'tudo' || video.ageDays <= Number(period))
       .filter((video) => channel === 'todos' || video.channelHandle === channel);
-    const sorters = { score: (a: typeof list[number], b: typeof list[number]) => (b.score ?? -1) - (a.score ?? -1), views: (a: typeof list[number], b: typeof list[number]) => b.views - a.views, recent: (a: typeof list[number], b: typeof list[number]) => Date.parse(b.published) - Date.parse(a.published) };
+    const sorters: Record<Sort, (a: AnalyzedVideo, b: AnalyzedVideo) => number> = {
+      score: (a, b) => (b.score ?? b.earlyScore ?? -1) - (a.score ?? a.earlyScore ?? -1),
+      agora: (a, b) => (b.heat ?? -1) - (a.heat ?? -1),
+      ritmo: (a, b) => b.viewsPerDay - a.viewsPerDay,
+      views: (a, b) => b.views - a.views,
+      recent: (a, b) => Date.parse(b.published) - Date.parse(a.published),
+    };
     return [...list].sort(sorters[sort]);
-  }, [analysis, channel, sort]);
+  }, [all, channel, sort, period, format, showAll, hasShorts]);
 
   if (!analysis?.radar.length) return <Panel><EmptyState icon={Flame} title="Nenhum canal no radar com métricas">Adicione canais na aba Canais e rode uma coleta.</EmptyState></Panel>;
 
   return (
     <>
+      <div className="mb-3 flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por canal">
+        {[{ handle: 'todos', title: 'Todos os canais', avatar: null as string | null }, ...analysis.radar].map((item) => (
+          <button
+            key={item.handle}
+            type="button"
+            onClick={() => setChannel(item.handle)}
+            aria-pressed={channel === item.handle}
+            className={`inline-flex h-8 items-center gap-2 rounded-lg px-3 text-[13px] transition-colors duration-150 ${channel === item.handle ? 'bg-ink text-canvas' : 'bg-sunken text-ink hover:bg-hover'}`}
+          >
+            {item.handle !== 'todos' ? <Avatar src={item.avatar} name={item.title} size={18} /> : null}
+            {item.title}
+          </button>
+        ))}
+      </div>
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="flex flex-wrap gap-1.5" role="group" aria-label="Filtrar por canal">
-          {[{ handle: 'todos', title: 'Todos os canais', avatar: null as string | null }, ...analysis.radar].map((item) => (
-            <button
-              key={item.handle}
-              type="button"
-              onClick={() => setChannel(item.handle)}
-              aria-pressed={channel === item.handle}
-              className={`inline-flex h-8 items-center gap-2 rounded-lg px-3 text-[13px] transition-colors duration-150 ${channel === item.handle ? 'bg-ink text-canvas' : 'bg-sunken text-ink hover:bg-hover'}`}
-            >
-              {item.handle !== 'todos' ? <Avatar src={item.avatar} name={item.title} size={18} /> : null}
-              {item.title}
-            </button>
-          ))}
-        </div>
-        <Select value={sort} onChange={(event) => setSort(event.target.value as typeof sort)} className="ml-auto h-8 w-auto text-[13px]" aria-label="Ordenar">
-          <option value="score">Mais acima da mediana</option>
+        <SegmentedControl label="Período" value={period} onChange={setPeriod} options={[{ value: '7', label: '7 dias' }, { value: '30', label: '30 dias' }, { value: 'tudo', label: 'Tudo' }]} />
+        {hasShorts ? <SegmentedControl label="Formato" value={format} onChange={setFormat} options={[{ value: 'videos', label: 'Vídeos' }, { value: 'shorts', label: 'Shorts' }, { value: 'todos', label: 'Todos' }]} /> : null}
+        {outside ? (
+          <button type="button" onClick={() => setShowAll((value) => !value)} aria-pressed={showAll} className={`h-8 rounded-full px-3 text-xs font-medium transition-colors duration-150 ${showAll ? 'bg-ink text-canvas' : 'text-ink-2 hover:bg-hover hover:text-ink'}`}>
+            {showAll ? 'Ocultar' : 'Mostrar'} {outside} fora do nicho
+          </button>
+        ) : null}
+        <Select value={sort} onChange={(event) => setSort(event.target.value as Sort)} className="ml-auto h-8 w-auto text-[13px]" aria-label="Ordenar">
+          <option value="score">Mais acima do normal</option>
+          <option value="agora">Ganhando views agora</option>
+          <option value="ritmo">Mais views por dia</option>
           <option value="views">Mais views</option>
           <option value="recent">Mais recentes</option>
         </Select>
       </div>
+      {!videos.length ? <Panel><EmptyState icon={Flame} title="Nenhum vídeo com esses filtros">Aumente o período ou escolha outro canal.</EmptyState></Panel> : null}
       <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
         {videos.map((video) => (
           <article key={video.id} className="group min-w-0">
             <a href={`https://www.youtube.com/watch?v=${video.id}`} target="_blank" rel="noreferrer" className="block">
-              <Thumb videoId={video.id} quality="hqdefault" alt="" className="rounded-xl" badge={video.score != null ? formatScore(video.score) : 'NOVO'} />
+              <Thumb videoId={video.id} quality="hqdefault" alt="" className="rounded-xl" badge={scoreLabel(video)} />
             </a>
             <div className="mt-3 flex gap-3">
               <Avatar src={analysis.channels.get(video.channelHandle)?.avatar} name={video.channelTitle} size={36} />
@@ -76,7 +110,11 @@ function Trending() {
                 <Link to={`/radar/${encodeURIComponent(video.channelHandle)}`} className="mt-1 block text-xs text-ink-2 hover:text-ink">{video.channelTitle}</Link>
                 <p className="text-xs text-ink-3">
                   {formatCompact(video.views)} visualizações · {formatAge(video.published)}
+                  {video.short ? ' · Short' : video.duration ? ` · ${Math.round(video.duration / 60)} min` : ''}
                 </p>
+                {video.gained24h ? (
+                  <p className={`text-xs tabular-nums ${(video.heat ?? 0) >= 0.3 ? 'font-medium text-up' : 'text-ink-3'}`}>+{formatCompact(video.gained24h)} nas últimas 24h</p>
+                ) : null}
               </div>
               {saved.has(video.id) ? (
                 <span className="flex size-8 shrink-0 items-center justify-center text-up" title="Na biblioteca">
@@ -90,6 +128,22 @@ function Trending() {
         ))}
       </div>
     </>
+  );
+}
+
+const PHASES: Record<ChannelPhase, { label: string; tone: 'up' | 'neutral' | 'down'; icon: typeof TrendingUp }> = {
+  alta: { label: 'Em alta', tone: 'up', icon: TrendingUp },
+  estavel: { label: 'Estável', tone: 'neutral', icon: Minus },
+  queda: { label: 'Esfriando', tone: 'down', icon: TrendingDown },
+};
+
+function PhaseBadge({ channel }: { channel: AnalyzedChannel }) {
+  if (!channel.phase || channel.phaseRatio == null) return <span className="text-ink-3">—</span>;
+  const phase = PHASES[channel.phase];
+  return (
+    <span title={`Últimos 5 vídeos em ${formatScore(channel.phaseRatio)} a mediana dos 15 recentes`}>
+      <Badge tone={phase.tone} icon={phase.icon}>{phase.label}</Badge>
+    </span>
   );
 }
 
@@ -117,7 +171,9 @@ function ChannelRow({ label, handle, channel, you }: { label: string; handle: st
       {channel ? (
         <>
           <td className="py-3 pr-4 text-right tabular-nums">{formatCompact(channel.subscribers)}</td>
+          <td className="hidden py-3 pr-4 text-right lg:table-cell"><Delta value={channel.subscribersGained30d} format={formatCompact} /></td>
           <td className="hidden py-3 pr-4 text-right tabular-nums md:table-cell">{formatCompact(channel.baseline)}</td>
+          <td className="hidden py-3 pr-4 md:table-cell"><PhaseBadge channel={channel} /></td>
           <td className="hidden py-3 pr-4 whitespace-nowrap text-ink-2 md:table-cell">{channel.uploadEveryDays ? `a cada ~${Math.round(channel.uploadEveryDays)}d` : '—'}</td>
           <td className="hidden py-3 pr-4 text-ink-2 lg:table-cell">{channel.daysSinceUpload == null ? '—' : channel.daysSinceUpload < 1 ? 'hoje' : `há ${Math.floor(channel.daysSinceUpload)}d`}</td>
           <td className="hidden py-3 pr-4 xl:table-cell">
@@ -132,7 +188,7 @@ function ChannelRow({ label, handle, channel, you }: { label: string; handle: st
           </td>
         </>
       ) : (
-        <td colSpan={5} className="py-3 pr-4 text-xs text-ink-3">
+        <td colSpan={7} className="py-3 pr-4 text-xs text-ink-3">
           Aguardando coleta
         </td>
       )}
@@ -193,7 +249,7 @@ function Channels() {
       <Panel
         padded={false}
         title="Comparação lado a lado"
-        description="Mediana de views dos últimos vídeos e ritmo de postagem de cada canal"
+        description="Mediana de views dos últimos 15 vídeos longos, ritmo de postagem e se o canal está esquentando ou esfriando"
         actions={
           <>
             <Button size="sm" variant="ghost" icon={RefreshCw} loading={collecting} onClick={() => void collect()}>
@@ -213,7 +269,9 @@ function Channels() {
               <tr className="border-y border-line text-left text-xs text-ink-2">
                 <th className="py-2.5 pl-5 font-medium">Canal</th>
                 <th className="py-2.5 pr-4 text-right font-medium">Inscritos</th>
+                <th className="hidden py-2.5 pr-4 text-right font-medium lg:table-cell">30 dias</th>
                 <th className="hidden py-2.5 pr-4 text-right font-medium md:table-cell">Mediana</th>
+                <th className="hidden py-2.5 pr-4 font-medium md:table-cell">Fase</th>
                 <th className="hidden py-2.5 pr-4 font-medium md:table-cell">Ritmo</th>
                 <th className="hidden py-2.5 pr-4 font-medium lg:table-cell">Último vídeo</th>
                 <th className="hidden py-2.5 pr-4 font-medium xl:table-cell">Melhor recente</th>
@@ -268,7 +326,7 @@ function Channels() {
   );
 }
 
-function Topics() {
+function TopicList() {
   const { analysis } = useData();
   const { createPauta } = useCreate();
   const topics = analysis?.topics ?? [];
@@ -319,6 +377,110 @@ function Topics() {
   );
 }
 
+function patternVerdict(pattern: TitlePattern): { label: string; tone: 'accent' | 'up' | 'down' } | null {
+  if (pattern.lift < 0.95) return { label: 'Não ajuda no radar', tone: 'down' };
+  if (pattern.lift >= 1.15 && (pattern.ownShare ?? 1) <= 0.35) return { label: 'Oportunidade', tone: 'accent' };
+  if (pattern.lift >= 1.1 && (pattern.ownShare ?? 0) >= 0.6) return { label: 'Ela já usa bem', tone: 'up' };
+  return null;
+}
+
+function TitlePatterns() {
+  const { analysis } = useData();
+  const patterns = analysis?.patterns ?? [];
+  if (!patterns.length) return null;
+  return (
+    <Panel
+      padded={false}
+      title={
+        <span className="flex items-center gap-2">
+          <Type size={16} className="text-ink-3" aria-hidden /> Estruturas de título que puxam views
+        </span>
+      }
+      description="Desempenho mediano dos vídeos do nicho no radar com e sem cada estrutura, ao lado de quanto a Jéssica já usa nos 15 títulos recentes"
+    >
+      <ul className="divide-y divide-line border-t border-line">
+        {patterns.map((pattern) => {
+          const verdict = patternVerdict(pattern);
+          return (
+            <li key={pattern.id} className="grid gap-3 px-5 py-3.5 md:grid-cols-[minmax(200px,1fr)_minmax(180px,1fr)_auto] md:items-center">
+              <div className="min-w-0">
+                <p className="flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
+                  {pattern.label}
+                  {verdict ? <Badge tone={verdict.tone}>{verdict.label}</Badge> : null}
+                </p>
+                <p className="mt-0.5 text-xs text-ink-3">Ex.: {pattern.example}</p>
+              </div>
+              <div className="text-xs text-ink-2 tabular-nums">
+                <p>
+                  <span className={`font-medium ${pattern.lift >= 1.1 ? 'text-up' : pattern.lift < 0.95 ? 'text-down' : 'text-ink'}`}>{formatScore(pattern.withScore)}</span> com · {formatScore(pattern.withoutScore)} sem
+                  <span className="text-ink-3"> · {pattern.count} de {pattern.total} vídeos</span>
+                </p>
+                <p className="mt-0.5">
+                  Jéssica usa em {pattern.ownShare == null ? '—' : formatPercent(pattern.ownShare, 0)}
+                  {pattern.ownLift != null ? <span className="text-ink-3"> · no canal dela rende {formatScore(pattern.ownLift)} o normal</span> : null}
+                </p>
+              </div>
+              <div className="flex gap-1.5 overflow-x-auto scrollbar-none md:justify-end">
+                {pattern.videoIds.slice(0, 3).map((videoId) => {
+                  const video = analysis?.videoById.get(videoId);
+                  return (
+                    <a key={videoId} href={`https://www.youtube.com/watch?v=${videoId}`} target="_blank" rel="noreferrer" title={video?.title} className="shrink-0">
+                      <Thumb videoId={videoId} className="w-24" badge={video?.score != null ? formatScore(video.score) : undefined} />
+                    </a>
+                  );
+                })}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+      <p className="border-t border-line px-5 py-3 text-2xs text-ink-3">1,0x é a mediana de cada canal. Correlação, não garantia: use como ponto de partida para testar títulos.</p>
+    </Panel>
+  );
+}
+
+function DurationTable() {
+  const { analysis } = useData();
+  const buckets = analysis?.durations ?? [];
+  if (!buckets.length) return null;
+  return (
+    <Panel padded={false} title="Duração dos vídeos" description="Desempenho mediano por faixa de duração, só vídeos longos">
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-y border-line text-left text-2xs text-ink-3">
+            <th className="py-2 pl-5 font-normal">Duração</th>
+            <th className="py-2 pr-4 text-right font-normal">Radar</th>
+            <th className="py-2 pr-5 text-right font-normal">Jéssica</th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-line">
+          {buckets.map((bucket) => (
+            <tr key={bucket.id}>
+              <td className="py-2.5 pl-5 text-ink-2">{bucket.label}</td>
+              <td className="py-2.5 pr-4 text-right tabular-nums">
+                {bucket.radarScore == null ? '—' : <ScoreBadge score={bucket.radarScore} />} <span className="text-2xs text-ink-3">{bucket.radarCount} vídeos</span>
+              </td>
+              <td className="py-2.5 pr-5 text-right tabular-nums">
+                {bucket.ownScore == null ? '—' : <ScoreBadge score={bucket.ownScore} />} <span className="text-2xs text-ink-3">{bucket.ownCount} vídeos</span>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </Panel>
+  );
+}
+
+function Topics() {
+  return (
+    <div className="space-y-5">
+      <TopicList />
+      <TitlePatterns />
+      <DurationTable />
+    </div>
+  );
+}
+
 export function Radar() {
   const { db, analysis } = useData();
   const [params, setParams] = useSearchParams();
@@ -332,7 +494,7 @@ export function Radar() {
 
   return (
     <>
-      <PageHeader title="Radar" description={`${db.channels.length} ${db.channels.length === 1 ? 'canal monitorado' : 'canais monitorados'} · o selo mostra quantas vezes o vídeo superou a mediana do próprio canal`}>
+      <PageHeader title="Radar" description={`${db.channels.length} ${db.channels.length === 1 ? 'canal monitorado' : 'canais monitorados'} · o selo mostra quantas vezes o vídeo superou a mediana do próprio canal; nos vídeos novos, a largada contra os do canal com a mesma idade`}>
         <div role="tablist" aria-label="Seções do radar" className="mt-4 flex gap-6 overflow-x-auto border-b border-line scrollbar-none">
           {TABS.map((item) => (
             <button

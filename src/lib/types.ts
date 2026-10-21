@@ -90,6 +90,9 @@ export interface Video {
   published: string;
   views: number;
   likes: number;
+  // Duração em segundos e formato vêm das abas do canal; coletas antigas não têm
+  duration?: number | null;
+  short?: boolean;
 }
 
 export interface ChannelMetrics {
