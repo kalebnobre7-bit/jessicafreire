@@ -31,22 +31,24 @@ export function useCreate() {
     navigate(`/relatorios/${id}`);
   }, [mutate, navigate]);
 
-  // Garante o vídeo na biblioteca e devolve o id da referência (existente ou nova)
-  const ensureVideoReference = useCallback((videoId: string): string | null => {
+  // Garante o vídeo na biblioteca e devolve o id da referência (existente ou nova).
+  // Vídeos fora das métricas (busca de vídeos para modelar) passam título e canal em `known`.
+  const ensureVideoReference = useCallback((videoId: string, known?: { title: string; channel: string }): string | null => {
     const existing = getDb().references.find((reference) => reference.videoId === videoId);
     if (existing) return existing.id;
     const video = analysis?.videoById.get(videoId);
-    if (!video) return null;
+    const title = video?.title ?? known?.title;
+    if (!title) return null;
     const id = createId();
     mutate((db) => {
-      db.references.unshift({ id, kind: 'video', url: `https://www.youtube.com/watch?v=${videoId}`, videoId, image: null, title: video.title, channel: video.channelTitle, note: '', tags: [], savedAt: Date.now() });
+      db.references.unshift({ id, kind: 'video', url: `https://www.youtube.com/watch?v=${videoId}`, videoId, image: null, title, channel: video?.channelTitle ?? known?.channel ?? '', note: '', tags: [], savedAt: Date.now() });
     });
     return id;
   }, [analysis, getDb, mutate]);
 
-  const saveReference = useCallback((videoId: string) => {
+  const saveReference = useCallback((videoId: string, known?: { title: string; channel: string }) => {
     const existed = getDb().references.some((reference) => reference.videoId === videoId);
-    ensureVideoReference(videoId);
+    ensureVideoReference(videoId, known);
     toast(existed ? 'Esse vídeo já está na Biblioteca.' : 'Salvo na Biblioteca.');
   }, [ensureVideoReference, getDb, toast]);
 
