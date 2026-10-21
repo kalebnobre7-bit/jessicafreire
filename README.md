@@ -47,4 +47,4 @@ npm run dev          # http://localhost:5173 (as rotas /api só rodam na Vercel 
 npx vercel deploy --prod   # publica
 ```
 
-O projeto não está ligado ao GitHub pela Vercel, então o deploy é por esse comando.
+O projeto não está ligado ao GitHub pela Vercel. O workflow `.github/workflows/vercel.yml` roda esse mesmo comando a cada push na `main` (precisa do secret `VERCEL_TOKEN` no repositório); o comando manual continua funcionando.
