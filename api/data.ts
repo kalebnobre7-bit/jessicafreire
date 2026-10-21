@@ -1,8 +1,8 @@
-// Arquivos de leitura do repositório de dados: metrics.json e ai-ideas.json.
+// Arquivos de leitura do repositório de dados: metrics.json, ai-ideas.json e discover.json.
 import type { VercelRequest, VercelResponse } from '@vercel/node';
 import { github, requireSession } from './_lib.js';
 
-const FILES: Record<string, string> = { metrics: 'metrics.json', ideas: 'ai-ideas.json' };
+const FILES: Record<string, string> = { metrics: 'metrics.json', ideas: 'ai-ideas.json', discover: 'discover.json' };
 
 export default async function handler(request: VercelRequest, response: VercelResponse) {
   if (!requireSession(request, response)) return;

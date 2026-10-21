@@ -55,7 +55,7 @@ export async function writeDb(value: unknown, sha: string | null, message: strin
   return (await request<{ sha: string }>('/db', { method: 'PUT', body: JSON.stringify({ value, sha, message }) })).sha;
 }
 
-export async function readDataFile<T>(file: 'metrics' | 'ideas'): Promise<T> {
+export async function readDataFile<T>(file: 'metrics' | 'ideas' | 'discover'): Promise<T> {
   return request<T>(`/data?file=${file}`);
 }
 

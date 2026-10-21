@@ -142,3 +142,30 @@ export interface AiRun {
   error?: string;
   ideas: AiIdea[];
 }
+
+// Vídeos do mês sobre IA e TikTok Shop achados na busca do YouTube (discover.json)
+export interface DiscoveredVideo {
+  id: string;
+  title: string;
+  channelTitle: string;
+  channelHandle: string;
+  views: number;
+  publishedText: string;
+  published: string;
+  duration: number | null;
+  queries: string[];
+  subscribers: number | null;
+  channelMedian: number | null;
+  // Views contra a mediana dos últimos vídeos do canal
+  score: number | null;
+  // Views contra inscritos
+  ratio: number | null;
+  viewsPerDay: number;
+  inRadar: boolean;
+}
+
+export interface Discover {
+  updatedAt: string;
+  queries: string[];
+  videos: DiscoveredVideo[];
+}

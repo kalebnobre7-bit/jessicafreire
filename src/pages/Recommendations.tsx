@@ -1,16 +1,17 @@
-import { BookmarkPlus, ChevronDown, CircleAlert, Clapperboard, ExternalLink, Image, KeyRound, Lightbulb, Plus, Sparkles, X } from 'lucide-react';
+import { Bookmark, BookmarkCheck, BookmarkPlus, ChevronDown, CircleAlert, Clapperboard, ExternalLink, Image, KeyRound, Lightbulb, Plus, Sparkles, Telescope, UserPlus, X } from 'lucide-react';
 import { useMemo, useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router';
-import { Button } from '@/components/ui/button';
+import { Button, IconButton } from '@/components/ui/button';
 import { Badge, EmptyState, PageHeader, Panel, Skeleton } from '@/components/ui/feedback';
-import { Input } from '@/components/ui/form';
-import { Thumb } from '@/components/ui/media';
+import { Input, SegmentedControl } from '@/components/ui/form';
+import { Avatar, Thumb } from '@/components/ui/media';
 import { DATA_REPO } from '@/lib/constants';
 import { createId, createPauta } from '@/lib/database';
-import { formatAge, formatDate } from '@/lib/format';
+import { formatAge, formatCompact, formatDate, formatScore } from '@/lib/format';
 import { buildRecommendations, RECOMMENDATION_LABEL, type Recommendation } from '@/lib/recommendations';
-import type { AiIdea, AiRun } from '@/lib/types';
+import type { AiIdea, AiRun, DiscoveredVideo } from '@/lib/types';
 import { useAiIdeas } from '@/hooks/useAiIdeas';
+import { useDiscover } from '@/hooks/useDiscover';
 import { useCreate } from '@/hooks/useCreate';
 import { useData } from '@/store/data';
 import { useUi } from '@/store/ui';
@@ -98,6 +99,7 @@ function AiSection() {
   const navigate = useNavigate();
   const { ensureVideoReference } = useCreate();
   const { runs, generating, unavailable, generate } = useAiIdeas();
+  const { discover } = useDiscover();
   const [focus, setFocus] = useState('');
 
   const latest = runs?.[0];
@@ -117,7 +119,11 @@ function AiSection() {
   };
 
   const toPauta = (idea: AiIdea) => {
-    const referenceIds = idea.referenceVideoIds.map((videoId) => ensureVideoReference(videoId)).filter((id): id is string => Boolean(id));
+    const known = (videoId: string) => {
+      const video = discover?.videos.find((item) => item.id === videoId);
+      return video ? { title: video.title, channel: video.channelTitle } : undefined;
+    };
+    const referenceIds = idea.referenceVideoIds.map((videoId) => ensureVideoReference(videoId, known(videoId))).filter((id): id is string => Boolean(id));
     const pauta = createPauta({ title: idea.title, promise: idea.angle, notes: `Por que: ${idea.why}\nThumb: ${idea.thumbnail}\nFormato: ${idea.format}`, referenceIds });
     pauta.sections[0] = { ...pauta.sections[0]!, body: idea.hook };
     mutate((draft) => {
@@ -219,6 +225,122 @@ function OlderRuns({ runs }: { runs: AiRun[] }) {
   );
 }
 
+type DiscoverFilter = 'todos' | 'novos' | 'radar';
+
+function ModelCard({ video, saved, tracked }: { video: DiscoveredVideo; saved: boolean; tracked: boolean }) {
+  const { mutate } = useData();
+  const { toast } = useUi();
+  const { createPauta: createAndOpen, saveReference, ensureVideoReference } = useCreate();
+  const known = { title: video.title, channel: video.channelTitle };
+  const url = `https://www.youtube.com/watch?v=${video.id}`;
+
+  const model = () => {
+    const referenceId = ensureVideoReference(video.id, known);
+    createAndOpen({
+      title: `Modelar: ${video.title}`,
+      promise: `Pegar a estrutura do vídeo de ${video.channelTitle} e adaptar ao público da Jéssica, sem copiar.`,
+      notes: `Referência: ${video.channelTitle}, "${video.title}" · ${formatCompact(video.views)} views ${video.publishedText}${video.score != null ? ` · ${formatScore(video.score)} a mediana do canal` : ''}.\nDesmontar gancho, ritmo, demonstração e CTA antes de escrever o roteiro.`,
+      referenceIds: referenceId ? [referenceId] : [],
+    });
+  };
+
+  const track = () => {
+    mutate((draft) => void draft.channels.push({ id: createId(), name: video.channelTitle, handle: video.channelHandle, note: 'Achado em vídeos para modelar' }));
+    toast(`${video.channelTitle} entrou no radar. Os números aparecem na próxima coleta.`);
+  };
+
+  return (
+    <article className="group flex min-w-0 flex-col">
+      <a href={url} target="_blank" rel="noreferrer" className="block">
+        <Thumb videoId={video.id} quality="hqdefault" alt="" className="rounded-xl" badge={video.score != null ? formatScore(video.score) : undefined} />
+      </a>
+      <div className="mt-3 flex gap-3">
+        <Avatar name={video.channelTitle} size={32} />
+        <div className="min-w-0 flex-1">
+          <a href={url} target="_blank" rel="noreferrer" className="line-clamp-2 text-sm leading-snug font-medium text-ink hover:underline">
+            {video.title}
+          </a>
+          <a href={`https://www.youtube.com/${video.channelHandle}`} target="_blank" rel="noreferrer" className="mt-1 flex items-center gap-1.5 text-xs text-ink-2 hover:text-ink">
+            <span className="truncate">{video.channelTitle}</span>
+            {tracked ? <Badge>No radar</Badge> : <Badge tone="accent">Canal novo</Badge>}
+          </a>
+          <p className="text-xs text-ink-3">
+            {formatCompact(video.views)} views · {video.publishedText}
+            {video.duration ? ` · ${Math.round(video.duration / 60)} min` : ''}
+          </p>
+          <p className="text-xs text-ink-3 tabular-nums">
+            {video.channelMedian != null ? `mediana do canal ${formatCompact(video.channelMedian)}` : ''}
+            {video.subscribers != null ? ` · ${formatCompact(video.subscribers)} inscritos` : ''}
+          </p>
+        </div>
+      </div>
+      <div className="mt-auto flex flex-wrap items-center gap-1.5 pt-3">
+        <Button size="sm" icon={Lightbulb} onClick={model}>
+          Modelar
+        </Button>
+        {!tracked ? (
+          <Button size="sm" variant="ghost" icon={UserPlus} onClick={track}>
+            Pôr no radar
+          </Button>
+        ) : null}
+        <span className="ml-auto">
+          {saved ? (
+            <span className="flex size-8 items-center justify-center text-up" title="Na biblioteca">
+              <BookmarkCheck size={18} aria-label="Na biblioteca" />
+            </span>
+          ) : (
+            <IconButton icon={Bookmark} size="sm" label="Salvar na biblioteca" onClick={() => saveReference(video.id, known)} />
+          )}
+        </span>
+      </div>
+    </article>
+  );
+}
+
+function VideosToModel() {
+  const { db } = useData();
+  const { discover, state } = useDiscover();
+  const [filter, setFilter] = useState<DiscoverFilter>('todos');
+  const [expanded, setExpanded] = useState(false);
+  const tracked = new Set([db.profile.handle, ...db.channels.map((channel) => channel.handle)].map((handle) => handle.toLowerCase()));
+  const saved = new Set(db.references.map((reference) => reference.videoId));
+  const videos = (discover?.videos ?? []).filter((video) => filter === 'todos' || (filter === 'radar') === tracked.has(video.channelHandle));
+  const visible = expanded ? videos : videos.slice(0, 8);
+
+  return (
+    <Panel
+      title={
+        <span className="flex items-center gap-2">
+          <Telescope size={17} className="text-accent" aria-hidden /> Vídeos para modelar
+        </span>
+      }
+      description={`Vídeos do último mês sobre IA e TikTok Shop, de canais parecidos com o da Jéssica, que passaram de 1,5x a mediana do próprio canal${discover ? ` · busca ${formatAge(discover.updatedAt)}` : ''}`}
+      actions={discover?.videos.length ? <SegmentedControl label="Canais" value={filter} onChange={setFilter} options={[{ value: 'todos', label: 'Todos' }, { value: 'novos', label: 'Canais novos' }, { value: 'radar', label: 'Do radar' }]} /> : null}
+    >
+      {state === 'loading' ? <Skeleton className="h-60" /> : null}
+      {state === 'missing' ? <p className="text-[13px] text-ink-2">A primeira busca roda na próxima coleta automática (06h ou 18h).</p> : null}
+      {state === 'failed' ? <p className="text-[13px] text-ink-2">Não foi possível carregar a busca agora. Tente recarregar a página.</p> : null}
+      {state === 'ready' && !videos.length ? <p className="text-[13px] text-ink-2">Nenhum vídeo passou da régua nesta busca.</p> : null}
+      {visible.length ? (
+        <>
+          <div className="grid gap-x-4 gap-y-7 sm:grid-cols-2 lg:grid-cols-3 2xl:grid-cols-4">
+            {visible.map((video) => (
+              <ModelCard key={video.id} video={video} saved={saved.has(video.id)} tracked={tracked.has(video.channelHandle)} />
+            ))}
+          </div>
+          {videos.length > visible.length ? (
+            <div className="mt-5 flex justify-center">
+              <Button size="sm" variant="ghost" icon={ChevronDown} onClick={() => setExpanded(true)}>
+                Ver todos os {videos.length}
+              </Button>
+            </div>
+          ) : null}
+        </>
+      ) : null}
+    </Panel>
+  );
+}
+
 function RecommendationRow({ recommendation }: { recommendation: Recommendation }) {
   const { db, mutate } = useData();
   const navigate = useNavigate();
@@ -282,6 +404,7 @@ export function Recommendations() {
       <PageHeader title="O que gravar" description="Ideias da IA e sugestões calculadas a partir do canal, do radar e da biblioteca" />
       <div className="space-y-5">
         <AiSection />
+        <VideosToModel />
         <Panel
           title="Sugestões dos dados"
           description="Atualizam sozinhas a cada coleta; dispense o que não fizer sentido"
