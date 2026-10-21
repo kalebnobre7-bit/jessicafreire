@@ -44,7 +44,7 @@ As tentativas de login são limitadas por IP (8 a cada 10 minutos).
 ```bash
 npm install
 npm run dev          # http://localhost:5173 (as rotas /api só rodam na Vercel ou com `vercel dev`)
-npx vercel deploy --prod   # publica
+npx vercel deploy --prod   # publica na mão, se precisar
 ```
 
-O projeto não está ligado ao GitHub pela Vercel, então o deploy é por esse comando (ou pelo conector da Vercel). Para publicar a cada merge, ligue o repositório em Vercel › jessicafreire › Settings › Git.
+A Vercel está ligada a este repositório: todo push na `main` publica em produção, e cada branch ou PR ganha um preview.
